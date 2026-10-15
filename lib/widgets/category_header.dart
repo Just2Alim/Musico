@@ -4,11 +4,8 @@ class CategoryHeader extends StatelessWidget {
   final String title;
   final VoidCallback? onSeeAllPressed;
 
-  const CategoryHeader({
-    Key? key,
-    required this.title,
-    this.onSeeAllPressed,
-  }) : super(key: key);
+  const CategoryHeader({Key? key, required this.title, this.onSeeAllPressed})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {

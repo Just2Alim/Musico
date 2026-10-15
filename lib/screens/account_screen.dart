@@ -1,10 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:graphql_flutter/graphql_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:math';
-import '../graphql/graphql_config.dart';
-import '../providers/AudioPlayerAlternativeProvider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../features/player/playback_cubit.dart';
+import '../data/theme_provider.dart';
+import '../data/supabase_config.dart';
+import '../data/device_info_service.dart';
+import '../providers/audio_player_provider.dart';
 import '../widgets/mini_player.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -14,21 +20,24 @@ class AccountScreen extends StatefulWidget {
   _AccountScreenState createState() => _AccountScreenState();
 }
 
-class _AccountScreenState extends State<AccountScreen> with SingleTickerProviderStateMixin {
+class _AccountScreenState extends State<AccountScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isEditing = false;
   String? _userName;
   String? _userEmail;
   String? _profileImageUrl;
-  
+
   // Контроллеры для текстовых полей
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _imageUrlController = TextEditingController();
-  final TextEditingController _currentPasswordController = TextEditingController();
+  final TextEditingController _currentPasswordController =
+      TextEditingController();
   final TextEditingController _newPasswordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
-  
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
+
   // Данные для статистики
   Map<String, dynamic> _userStats = {
     'totalListened': 0,
@@ -39,7 +48,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
     'favoritesCount': 0,
     'recentlyPlayedCount': 0,
   };
-  
+
   // Настройки пользователя
   Map<String, dynamic> _userSettings = {
     'language': 'Русский',
@@ -49,7 +58,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
     'showExplicitContent': true,
     'autoPlayNext': true,
   };
-  
+
   bool _isLoading = true;
 
   @override
@@ -72,10 +81,9 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
     super.dispose();
   }
 
-  Future<int?> _getCurrentUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('userId');
-  }
+  Future<String?> _getCurrentUserId() async => SupabaseConfig.isConfigured
+      ? Supabase.instance.client.auth.currentUser?.id
+      : null;
 
   void _loadUserData() async {
     try {
@@ -86,60 +94,39 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
         });
         return;
       }
-      
-      final GraphQLClient client = GraphQLConfig.initClient();
-      final QueryResult result = await client.query(
-        QueryOptions(
-          document: gql('''
-            query Me {
-              me {
-                id
-                name
-                email
-                settings {
-                  language
-                  darkMode
-                  audioQuality
-                }
-              }
-            }
-          '''),
-          fetchPolicy: FetchPolicy.networkOnly,
-        ),
-      );
-      
-      if (result.hasException) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка загрузки данных профиля: ${result.exception.toString()}')),
-        );
+
+      final user = SupabaseConfig.isConfigured
+          ? Supabase.instance.client.auth.currentUser
+          : null;
+      final userData = user == null
+          ? null
+          : await Supabase.instance.client
+                .from('profiles')
+                .select()
+                .eq('id', user.id)
+                .maybeSingle();
+      if (userData != null && user != null) {
         setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-      
-      final userData = result.data?['me'];
-      if (userData != null) {
-        setState(() {
-          _userName = userData['name'];
-          _userEmail = userData['email'];
-          
+          _userName =
+              userData['display_name'] ?? user.userMetadata?['display_name'];
+          _userEmail = user.email;
+
           // Предположим, что у нас есть аватар из gravatar или подобного сервиса
           // В реальном приложении здесь будет реальный URL из базы данных
-          _profileImageUrl = 'https://www.gravatar.com/avatar/${userData['email'].hashCode}?d=identicon&s=200';
-          
+          _profileImageUrl = userData['avatar_url'];
+
           // Заполняем контроллеры текущими значениями
           _nameController.text = _userName ?? '';
           _emailController.text = _userEmail ?? '';
           _imageUrlController.text = _profileImageUrl ?? '';
-          
+
           // Если есть настройки, заполняем их
-          if (userData['settings'] != null) {
-            _userSettings['language'] = _mapLanguage(userData['settings']['language']);
-            _userSettings['darkMode'] = userData['settings']['darkMode'] ?? true;
-            _userSettings['audioQuality'] = _mapAudioQuality(userData['settings']['audioQuality']);
-          }
-          
+          _userSettings['language'] = _mapLanguage(userData['language']);
+          _userSettings['darkMode'] = userData['dark_mode'] ?? true;
+          _userSettings['audioQuality'] = _mapAudioQuality(
+            userData['audio_quality'],
+          );
+
           _isLoading = false;
         });
       } else {
@@ -149,32 +136,40 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       }
     } catch (e) {
       print('Ошибка загрузки данных профиля: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Произошла ошибка: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Произошла ошибка: $e')));
       setState(() {
         _isLoading = false;
       });
     }
   }
-  
+
   // Преобразование языкового кода в читаемое название
   String _mapLanguage(String? langCode) {
     switch (langCode) {
-      case 'ru': return 'Русский';
-      case 'en': return 'English';
-      case 'kk': return 'Қазақша';
-      default: return 'Русский';
+      case 'ru':
+        return 'Русский';
+      case 'en':
+        return 'English';
+      case 'kk':
+        return 'Қазақша';
+      default:
+        return 'Русский';
     }
   }
-  
+
   // Преобразование кода качества аудио в читаемое название
   String _mapAudioQuality(String? quality) {
     switch (quality) {
-      case 'low': return 'Низкое качество';
-      case 'normal': return 'Стандартное качество';
-      case 'high': return 'Высокое качество';
-      default: return 'Высокое качество';
+      case 'low':
+        return 'Низкое качество';
+      case 'normal':
+        return 'Стандартное качество';
+      case 'high':
+        return 'Высокое качество';
+      default:
+        return 'Высокое качество';
     }
   }
 
@@ -183,47 +178,46 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
     try {
       final userId = await _getCurrentUserId();
       if (userId == null) return;
-      
+
       // Генерируем демо-данные для статистики (в реальном приложении они будут из API)
       setState(() {
         // Общее время прослушивания (в часах)
-        _userStats['totalListened'] = Random().nextInt(300) + 50;
-        
+        _userStats['totalListened'] = 0;
+
         // Любимые жанры
         _userStats['favoriteGenres'] = {
-          'Поп': Random().nextInt(80) + 20,
-          'Рок': Random().nextInt(60) + 10,
-          'Хип-хоп': Random().nextInt(50) + 5,
-          'Электроника': Random().nextInt(40) + 15,
-          'Джаз': Random().nextInt(30),
+          'Поп': 0,
+          'Рок': 0,
+          'Хип-хоп': 0,
+          'Электроника': 0,
+          'Джаз': 0,
         };
-        
+
         // Топ исполнителей
         _userStats['topArtists'] = {
-          'Ed Sheeran': Random().nextInt(30) + 10,
-          'Imagine Dragons': Random().nextInt(25) + 5,
-          'The Weeknd': Random().nextInt(20) + 15,
-          'Billie Eilish': Random().nextInt(15) + 10,
-          'Queen': Random().nextInt(10) + 5,
+          'Ed Sheeran': 0,
+          'Imagine Dragons': 0,
+          'The Weeknd': 0,
+          'Billie Eilish': 0,
+          'Queen': 0,
         };
-        
+
         // Прослушивания по дням недели
         _userStats['listeningByDay'] = {
-          'Пн': Random().nextInt(10) + 2,
-          'Вт': Random().nextInt(10) + 2,
-          'Ср': Random().nextInt(10) + 2,
-          'Чт': Random().nextInt(10) + 2,
-          'Пт': Random().nextInt(10) + 2,
-          'Сб': Random().nextInt(10) + 2,
-          'Вс': Random().nextInt(10) + 2,
+          'Пн': 0,
+          'Вт': 0,
+          'Ср': 0,
+          'Чт': 0,
+          'Пт': 0,
+          'Сб': 0,
+          'Вс': 0,
         };
-        
+
         // Количество плейлистов, избранного и недавно прослушанного
-        _userStats['playlistsCount'] = Random().nextInt(20) + 1;
-        _userStats['favoritesCount'] = Random().nextInt(100) + 10;
-        _userStats['recentlyPlayedCount'] = Random().nextInt(500) + 50;
+        _userStats['playlistsCount'] = 0;
+        _userStats['favoritesCount'] = 0;
+        _userStats['recentlyPlayedCount'] = 0;
       });
-      
     } catch (e) {
       print('Ошибка загрузки статистики: $e');
     }
@@ -232,13 +226,13 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
   void _toggleEditMode() {
     setState(() {
       _isEditing = !_isEditing;
-      
+
       // Если выходим из режима редактирования, сбрасываем значения контроллеров
       if (!_isEditing) {
         _nameController.text = _userName ?? '';
         _emailController.text = _userEmail ?? '';
         _imageUrlController.text = _profileImageUrl ?? '';
-        
+
         // Очистить поля пароля
         _currentPasswordController.clear();
         _newPasswordController.clear();
@@ -255,110 +249,56 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       );
       return;
     }
-    
+
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       // Обновляем профиль
-      final GraphQLClient client = GraphQLConfig.initClient();
-      final QueryResult result = await client.mutate(
-        MutationOptions(
-          document: gql('''
-            mutation UpdateProfile(\$name: String, \$email: String) {
-              updateProfile(name: \$name, email: \$email) {
-                id
-                name
-                email
-              }
-            }
-          '''),
-          variables: {
-            'name': _nameController.text,
-            'email': _emailController.text,
-          },
+      if (!SupabaseConfig.isConfigured)
+        throw StateError('Supabase is not configured.');
+      final client = Supabase.instance.client;
+      await client.auth.updateUser(
+        UserAttributes(
+          email: _emailController.text.trim(),
+          data: {'display_name': _nameController.text.trim()},
         ),
       );
-      
-      if (result.hasException) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка обновления профиля: ${result.exception.toString()}')),
-        );
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-      
+      await client.from('profiles').upsert({
+        'id': client.auth.currentUser!.id,
+        'display_name': _nameController.text.trim(),
+        'avatar_url': _imageUrlController.text.trim().isEmpty
+            ? null
+            : _imageUrlController.text.trim(),
+        'language': _getLanguageCode(_userSettings['language']),
+        'dark_mode': _userSettings['darkMode'],
+        'audio_quality': _getAudioQualityCode(_userSettings['audioQuality']),
+      });
+
       // Если нужно обновить пароль
-      if (_currentPasswordController.text.isNotEmpty && 
-          _newPasswordController.text.isNotEmpty && 
+      if (_currentPasswordController.text.isNotEmpty &&
+          _newPasswordController.text.isNotEmpty &&
           _confirmPasswordController.text.isNotEmpty) {
-        
         // Проверяем, что новые пароли совпадают
         if (_newPasswordController.text != _confirmPasswordController.text) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Новые пароли не совпадают')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Новые пароли не совпадают')));
           setState(() {
             _isLoading = false;
           });
           return;
         }
-        
+
         // Обновляем пароль
-        final passwordResult = await client.mutate(
-          MutationOptions(
-            document: gql('''
-              mutation UpdatePassword(\$oldPassword: String!, \$newPassword: String!) {
-                updatePassword(oldPassword: \$oldPassword, newPassword: \$newPassword)
-              }
-            '''),
-            variables: {
-              'oldPassword': _currentPasswordController.text,
-              'newPassword': _newPasswordController.text,
-            },
-          ),
+        await client.auth.updateUser(
+          UserAttributes(password: _newPasswordController.text),
         );
-        
-        if (passwordResult.hasException) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Ошибка обновления пароля: ${passwordResult.exception.toString()}')),
-          );
-          setState(() {
-            _isLoading = false;
-          });
-          return;
-        }
       }
-      
+
       // Обновляем настройки пользователя
-      final settingsResult = await client.mutate(
-        MutationOptions(
-          document: gql('''
-            mutation UpdateUserSettings(\$language: String, \$darkMode: Boolean, \$audioQuality: String) {
-              updateUserSettings(language: \$language, darkMode: \$darkMode, audioQuality: \$audioQuality) {
-                language
-                darkMode
-                audioQuality
-              }
-            }
-          '''),
-          variables: {
-            'language': _getLanguageCode(_userSettings['language']),
-            'darkMode': _userSettings['darkMode'],
-            'audioQuality': _getAudioQualityCode(_userSettings['audioQuality']),
-          },
-        ),
-      );
-      
-      if (settingsResult.hasException) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка обновления настроек: ${settingsResult.exception.toString()}')),
-        );
-      }
-      
+
       // Обновляем данные в UI
       setState(() {
         _userName = _nameController.text;
@@ -369,63 +309,71 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
         _isEditing = false;
         _isLoading = false;
       });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Профиль успешно обновлен')),
-      );
-      
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Профиль успешно обновлен')));
+
       // Очистить поля пароля
       _currentPasswordController.clear();
       _newPasswordController.clear();
       _confirmPasswordController.clear();
-      
     } catch (e) {
       print('Ошибка сохранения профиля: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Произошла ошибка: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Произошла ошибка: $e')));
       setState(() {
         _isLoading = false;
       });
     }
   }
-  
+
   // Получение кода языка из читаемого названия
   String _getLanguageCode(String language) {
     switch (language) {
-      case 'Русский': return 'ru';
-      case 'English': return 'en';
-      case 'Қазақша': return 'kk';
-      default: return 'ru';
+      case 'Русский':
+        return 'ru';
+      case 'English':
+        return 'en';
+      case 'Қазақша':
+        return 'kk';
+      default:
+        return 'ru';
     }
   }
-  
+
   // Получение кода качества аудио из читаемого названия
   String _getAudioQualityCode(String quality) {
     switch (quality) {
-      case 'Низкое качество': return 'low';
-      case 'Стандартное качество': return 'normal';
-      case 'Высокое качество': return 'high';
-      default: return 'high';
+      case 'Низкое качество':
+        return 'low';
+      case 'Стандартное качество':
+        return 'normal';
+      case 'Высокое качество':
+        return 'high';
+      default:
+        return 'high';
     }
   }
 
   Future<void> _logout() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
-      Navigator.pushReplacementNamed(context, '/login');
+      if (SupabaseConfig.isConfigured)
+        await Supabase.instance.client.auth.signOut();
+      context.go('/login');
     } catch (e) {
       print('Ошибка при выходе: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка при выходе: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ошибка при выходе: $e')));
     }
   }
-  
+
   // Визуализация жанров
   Widget _buildGenresVisualization() {
-    final Map<String, int> genres = _userStats['favoriteGenres'] as Map<String, int>;
+    final Map<String, int> genres =
+        _userStats['favoriteGenres'] as Map<String, int>;
     final List<Color> colors = [
       Colors.red,
       Colors.green,
@@ -433,7 +381,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       Colors.amber,
       Colors.purple,
     ];
-    
+
     return Column(
       children: [
         for (int i = 0; i < genres.entries.length; i++)
@@ -445,13 +393,15 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       ],
     );
   }
-  
+
   // Полоса для визуализации жанра
   Widget _buildGenreBar(String genre, int count, Color color) {
     // Находим максимальное значение для масштабирования
-    final int maxValue = (_userStats['favoriteGenres'] as Map<String, int>).values.reduce(max);
-    final double percentage = count / maxValue;
-    
+    final int maxValue = (_userStats['favoriteGenres'] as Map<String, int>)
+        .values
+        .reduce(max);
+    final double percentage = maxValue == 0 ? 0 : count / maxValue;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -467,12 +417,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
                 ),
               ),
               Spacer(),
-              Text(
-                count.toString(),
-                style: TextStyle(
-                  color: Colors.grey[400],
-                ),
-              ),
+              Text(count.toString(), style: TextStyle(color: Colors.grey[400])),
             ],
           ),
           SizedBox(height: 4),
@@ -498,10 +443,11 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       ),
     );
   }
-  
+
   // Визуализация прослушиваний по дням недели
   Widget _buildWeeklyListeningVisualization() {
-    final Map<String, int> data = _userStats['listeningByDay'] as Map<String, int>;
+    final Map<String, int> data =
+        _userStats['listeningByDay'] as Map<String, int>;
     final List<Color> colors = [
       Colors.green.shade200,
       Colors.green.shade300,
@@ -511,14 +457,14 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       Colors.green.shade700,
       Colors.green.shade800,
     ];
-    final int maxValue = data.values.reduce(max);
-    
+    final int maxValue = max(1, data.values.reduce(max));
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: data.entries.map((entry) {
         final int index = data.keys.toList().indexOf(entry.key);
         final double percentage = entry.value / maxValue;
-        
+
         return Column(
           children: [
             Container(
@@ -543,10 +489,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
             SizedBox(height: 8),
             Text(
               entry.key,
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.grey[400], fontSize: 12),
             ),
             SizedBox(height: 4),
             Text(
@@ -565,9 +508,9 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final audioProvider = Provider.of<AudioPlayerAlternativeProvider>(context);
-    final currentTrack = audioProvider.currentTrack;
-    
+    final playback = context.watch<PlaybackCubit>().state;
+    final currentTrack = playback.currentTrack;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -578,14 +521,11 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.center,
-                colors: [
-                  Colors.green.withOpacity(0.6),
-                  Colors.black,
-                ],
+                colors: [Colors.green.withValues(alpha: 0.6), Colors.black],
               ),
             ),
           ),
-          
+
           // Основной контент
           _isLoading
               ? Center(child: CircularProgressIndicator(color: Colors.green))
@@ -594,7 +534,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
                     children: [
                       // Шапка с аватаром и именем
                       _buildProfileHeader(),
-                      
+
                       // Табы
                       Container(
                         margin: EdgeInsets.symmetric(horizontal: 16),
@@ -617,7 +557,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
                           ],
                         ),
                       ),
-                      
+
                       // Контент табов
                       Expanded(
                         child: TabBarView(
@@ -625,22 +565,22 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
                           children: [
                             // Таб профиля
                             _buildProfileTab(),
-                            
+
                             // Таб статистики
                             _buildStatsTab(),
-                            
+
                             // Таб настроек
                             _buildSettingsTab(),
                           ],
                         ),
                       ),
-                      
+
                       // Пространство для мини-плеера
                       SizedBox(height: currentTrack != null ? 80 : 0),
                     ],
                   ),
                 ),
-          
+
           // Мини-плеер
           if (currentTrack != null)
             Positioned(
@@ -651,53 +591,21 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
                 trackName: currentTrack.name,
                 artistName: currentTrack.artist,
                 coverImageUrl: currentTrack.coverImageUrl,
-                isPlaying: audioProvider.isPlaying,
-                isLoading: audioProvider.isLoading,
+                isPlaying: playback.isPlaying,
+                isLoading: playback.isLoading,
                 onTap: () {
-                  Navigator.pushNamed(
-                    context,
-                    '/player',
-                    arguments: {'trackId': currentTrack.id},
-                  );
+                  context.push('/player/${currentTrack.id}');
                 },
                 onPlayPause: () {
-                  audioProvider.togglePlayPause();
+                  context.read<PlaybackCubit>().togglePlayPause();
                 },
               ),
             ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.black,
-        selectedItemColor: Colors.green,
-        unselectedItemColor: Colors.grey,
-        currentIndex: 3, // Account tab
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Главная'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Поиск'),
-          BottomNavigationBarItem(icon: Icon(Icons.library_music), label: 'Библиотека'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Аккаунт'),
-        ],
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              Navigator.pushReplacementNamed(context, '/home');
-              break;
-            case 1:
-              Navigator.pushReplacementNamed(context, '/search');
-              break;
-            case 2:
-              Navigator.pushReplacementNamed(context, '/library');
-              break;
-            case 3:
-              // Уже на экране аккаунта
-              break;
-          }
-        },
-      ),
     );
   }
-  
+
   // Шапка профиля
   Widget _buildProfileHeader() {
     return Container(
@@ -716,7 +624,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
             child: Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.grey[900]!.withOpacity(0.8),
+                color: Colors.grey[900]!.withValues(alpha: 0.8),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -725,7 +633,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
               ),
             ),
           ),
-          
+
           Expanded(
             child: Center(
               child: Text(
@@ -738,14 +646,16 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
               ),
             ),
           ),
-          
+
           // Кнопка редактирования
           GestureDetector(
             onTap: _isEditing ? _saveProfile : _toggleEditMode,
             child: Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: _isEditing ? Colors.green : Colors.grey[900]!.withOpacity(0.8),
+                color: _isEditing
+                    ? Colors.green
+                    : Colors.grey[900]!.withValues(alpha: 0.8),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -758,7 +668,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       ),
     );
   }
-  
+
   // Таб профиля
   Widget _buildProfileTab() {
     return ListView(
@@ -788,18 +698,14 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
                       color: Colors.green,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      Icons.edit,
-                      color: Colors.white,
-                      size: 18,
-                    ),
+                    child: Icon(Icons.edit, color: Colors.white, size: 18),
                   ),
                 ),
             ],
           ),
         ),
         SizedBox(height: 20),
-        
+
         // Имя пользователя
         if (_isEditing)
           TextField(
@@ -829,7 +735,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
             ),
           ),
         SizedBox(height: 10),
-        
+
         // Email пользователя
         if (_isEditing)
           TextField(
@@ -851,14 +757,11 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
           Center(
             child: Text(
               _userEmail ?? 'email@example.com',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: Colors.grey, fontSize: 16),
             ),
           ),
         SizedBox(height: 20),
-        
+
         // URL изображения (только в режиме редактирования)
         if (_isEditing)
           Column(
@@ -889,7 +792,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
                 ),
               ),
               SizedBox(height: 30),
-              
+
               // Секция изменения пароля
               Text(
                 'Изменить пароль',
@@ -983,13 +886,13 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
                 value: _userStats['totalListened'].toString(),
                 color: Colors.green,
               ),
-              
+
               // Карточка Premium подписки
               SizedBox(height: 30),
               _buildPremiumCard(),
             ],
           ),
-        
+
         // Кнопка выхода
         SizedBox(height: 40),
         if (!_isEditing)
@@ -1009,12 +912,11 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       ],
     );
   }
-  
+
   // Таб статистики
   Widget _buildStatsTab() {
-    final genres = _userStats['favoriteGenres'] as Map<String, int>;
     final artists = _userStats['topArtists'] as Map<String, int>;
-    
+
     return ListView(
       padding: EdgeInsets.all(16),
       children: [
@@ -1049,7 +951,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
             ),
           ],
         ),
-        
+
         // График прослушиваний по дням недели
         SizedBox(height: 30),
         Text(
@@ -1069,7 +971,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
           ),
           child: _buildWeeklyListeningVisualization(),
         ),
-        
+
         // Диаграмма жанров
         SizedBox(height: 30),
         Text(
@@ -1089,7 +991,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
           ),
           child: _buildGenresVisualization(),
         ),
-        
+
         // Топ исполнителей
         SizedBox(height: 30),
         Text(
@@ -1103,13 +1005,10 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
         SizedBox(height: 16),
         Column(
           children: artists.entries.map((entry) {
-            return _buildArtistListItem(
-              name: entry.key,
-              count: entry.value,
-            );
+            return _buildArtistListItem(name: entry.key, count: entry.value);
           }).toList(),
         ),
-        
+
         // Рекомендации на основе статистики
         SizedBox(height: 30),
         Text(
@@ -1124,13 +1023,17 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
         _buildRecommendationCard(),
         SizedBox(height: 16),
         _buildDiscoverWeeklyCard(),
-        
+
         // Кнопка экспорта статистики
         SizedBox(height: 30),
         ElevatedButton.icon(
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Экспорт статистики будет доступен в ближайшем обновлении')),
+              SnackBar(
+                content: Text(
+                  'Экспорт статистики будет доступен в ближайшем обновлении',
+                ),
+              ),
             );
           },
           icon: Icon(Icons.download),
@@ -1146,7 +1049,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       ],
     );
   }
-  
+
   // Таб настроек
   Widget _buildSettingsTab() {
     return ListView(
@@ -1171,6 +1074,13 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
           },
         ),
         SizedBox(height: 10),
+        ListTile(
+          leading: const Icon(Icons.compare_arrows),
+          title: const Text('Примеры управления состоянием'),
+          subtitle: const Text('setState, InheritedWidget и Provider'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.go('/coursework/state-management'),
+        ),
         _buildSwitchTile(
           icon: Icons.dark_mode,
           title: 'Темная тема',
@@ -1179,9 +1089,12 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
             setState(() {
               _userSettings['darkMode'] = value;
             });
+            context.read<ThemeProvider>().setTheme(
+              value ? ThemeMode.dark : ThemeMode.light,
+            );
           },
         ),
-        
+
         // Настройки воспроизведения
         SizedBox(height: 30),
         Text(
@@ -1234,7 +1147,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
             });
           },
         ),
-        
+
         // Дополнительные настройки
         SizedBox(height: 30),
         Text(
@@ -1246,6 +1159,39 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
           ),
         ),
         SizedBox(height: 16),
+        ListTile(
+          leading: Icon(Icons.battery_std, color: Colors.green),
+          title: Text('Заряд батареи', style: TextStyle(color: Colors.white)),
+          trailing: FutureBuilder<int?>(
+            future: DeviceInfoService().batteryLevel(),
+            builder: (context, snapshot) => Text(
+              snapshot.hasError || snapshot.data == null
+                  ? 'Только Android'
+                  : '${snapshot.data}%',
+              style: TextStyle(color: Colors.grey[400]),
+            ),
+          ),
+        ),
+        if (const {
+          TargetPlatform.android,
+          TargetPlatform.iOS,
+        }.contains(defaultTargetPlatform))
+          Consumer<AudioPlayerAlternativeProvider>(
+            builder: (context, player, _) => SwitchListTile(
+              secondary: const Icon(Icons.vibration, color: Colors.green),
+              title: const Text(
+                'Переключать трек встряхиванием',
+                style: TextStyle(color: Colors.white),
+              ),
+              subtitle: const Text(
+                'Сильное встряхивание включает следующую композицию',
+                style: TextStyle(color: Colors.white70),
+              ),
+              value: player.shakeToSkipEnabled,
+              onChanged: player.setShakeToSkipEnabled,
+              activeColor: Colors.green,
+            ),
+          ),
         _buildActionTile(
           icon: Icons.delete,
           title: 'Очистить кэш',
@@ -1261,7 +1207,11 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
           subtitle: 'Сохраните плейлисты и настройки',
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Резервное копирование будет доступно в ближайшем обновлении')),
+              SnackBar(
+                content: Text(
+                  'Резервное копирование будет доступно в ближайшем обновлении',
+                ),
+              ),
             );
           },
         ),
@@ -1274,12 +1224,12 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
             _showAboutDialog();
           },
         ),
-        
+
         SizedBox(height: 30),
       ],
     );
   }
-  
+
   // Карточка с информацией о пользователе
   Widget _buildInfoTile({
     required IconData icon,
@@ -1298,14 +1248,10 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
           Container(
             padding: EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
+            child: Icon(icon, color: color, size: 24),
           ),
           SizedBox(width: 16),
           Expanded(
@@ -1314,10 +1260,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
                 ),
                 SizedBox(height: 4),
                 Text(
@@ -1335,7 +1278,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       ),
     );
   }
-  
+
   // Карточка Premium подписки
   Widget _buildPremiumCard() {
     return Container(
@@ -1353,11 +1296,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
         children: [
           Row(
             children: [
-              Icon(
-                Icons.stars,
-                color: Colors.amber,
-                size: 26,
-              ),
+              Icon(Icons.stars, color: Colors.amber, size: 26),
               SizedBox(width: 8),
               Text(
                 'Premium',
@@ -1372,16 +1311,13 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
           SizedBox(height: 16),
           Text(
             'Получите доступ к эксклюзивным функциям',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: 16),
           ),
           SizedBox(height: 8),
           Text(
             '• Офлайн-режим\n• Высокое качество звука\n• Без рекламы\n• Неограниченное количество плейлистов',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
               fontSize: 14,
               height: 1.5,
             ),
@@ -1390,7 +1326,11 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
           ElevatedButton(
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Premium подписка будет доступна в ближайшем обновлении')),
+                SnackBar(
+                  content: Text(
+                    'Premium подписка будет доступна в ближайшем обновлении',
+                  ),
+                ),
               );
             },
             style: ElevatedButton.styleFrom(
@@ -1403,16 +1343,14 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
             ),
             child: Text(
               'Попробовать Premium',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],
       ),
     );
   }
-  
+
   // Карточка с рекомендацией
   Widget _buildRecommendationCard() {
     return Container(
@@ -1421,10 +1359,12 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
         color: Colors.grey[900],
         borderRadius: BorderRadius.circular(10),
         image: DecorationImage(
-          image: NetworkImage('https://i.scdn.co/image/ab67706f00000003e8e28219724c2423afa4d320'),
+          image: NetworkImage(
+            'https://i.scdn.co/image/ab67706f00000003e8e28219724c2423afa4d320',
+          ),
           fit: BoxFit.cover,
           colorFilter: ColorFilter.mode(
-            Colors.black.withOpacity(0.5),
+            Colors.black.withValues(alpha: 0.5),
             BlendMode.darken,
           ),
         ),
@@ -1437,7 +1377,9 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               image: DecorationImage(
-                image: NetworkImage('https://i.scdn.co/image/ab67706f00000003e8e28219724c2423afa4d320'),
+                image: NetworkImage(
+                  'https://i.scdn.co/image/ab67706f00000003e8e28219724c2423afa4d320',
+                ),
                 fit: BoxFit.cover,
               ),
             ),
@@ -1449,10 +1391,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
               children: [
                 Text(
                   'На основе ваших предпочтений',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
                 ),
                 SizedBox(height: 4),
                 Text(
@@ -1467,7 +1406,11 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
                 ElevatedButton(
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Плейлист будет доступен в ближайшем обновлении')),
+                      SnackBar(
+                        content: Text(
+                          'Плейлист будет доступен в ближайшем обновлении',
+                        ),
+                      ),
                     );
                   },
                   style: ElevatedButton.styleFrom(
@@ -1488,7 +1431,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       ),
     );
   }
-  
+
   // Карточка с еженедельным дайджестом
   Widget _buildDiscoverWeeklyCard() {
     return Container(
@@ -1497,10 +1440,12 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
         color: Colors.grey[900],
         borderRadius: BorderRadius.circular(10),
         image: DecorationImage(
-          image: NetworkImage('https://i.scdn.co/image/ab67706f00000003c414e7daf34690c9f983f76e'),
+          image: NetworkImage(
+            'https://i.scdn.co/image/ab67706f00000003c414e7daf34690c9f983f76e',
+          ),
           fit: BoxFit.cover,
           colorFilter: ColorFilter.mode(
-            Colors.black.withOpacity(0.5),
+            Colors.black.withValues(alpha: 0.5),
             BlendMode.darken,
           ),
         ),
@@ -1513,7 +1458,9 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               image: DecorationImage(
-                image: NetworkImage('https://i.scdn.co/image/ab67706f00000003c414e7daf34690c9f983f76e'),
+                image: NetworkImage(
+                  'https://i.scdn.co/image/ab67706f00000003c414e7daf34690c9f983f76e',
+                ),
                 fit: BoxFit.cover,
               ),
             ),
@@ -1525,10 +1472,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
               children: [
                 Text(
                   'Обновляется каждый понедельник',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
                 ),
                 SizedBox(height: 4),
                 Text(
@@ -1543,7 +1487,11 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
                 ElevatedButton(
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Плейлист будет доступен в ближайшем обновлении')),
+                      SnackBar(
+                        content: Text(
+                          'Плейлист будет доступен в ближайшем обновлении',
+                        ),
+                      ),
                     );
                   },
                   style: ElevatedButton.styleFrom(
@@ -1564,7 +1512,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       ),
     );
   }
-  
+
   // Карточка статистики
   Widget _buildStatCard({
     required String title,
@@ -1581,11 +1529,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            color: color,
-            size: 32,
-          ),
+          Icon(icon, color: color, size: 32),
           SizedBox(height: 12),
           Text(
             value,
@@ -1596,23 +1540,14 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
             ),
           ),
           SizedBox(height: 8),
-          Text(
-            title,
-            style: TextStyle(
-              color: Colors.grey[400],
-              fontSize: 14,
-            ),
-          ),
+          Text(title, style: TextStyle(color: Colors.grey[400], fontSize: 14)),
         ],
       ),
     );
   }
-  
+
   // Элемент списка артистов
-  Widget _buildArtistListItem({
-    required String name,
-    required int count,
-  }) {
+  Widget _buildArtistListItem({required String name, required int count}) {
     return Container(
       margin: EdgeInsets.only(bottom: 10),
       padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -1626,7 +1561,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
             radius: 25,
             backgroundColor: Colors.grey[800],
             backgroundImage: NetworkImage(
-              'https://api.dicebear.com/7.x/initials/png?seed=$name&radius=50'
+              'https://api.dicebear.com/7.x/initials/png?seed=$name&radius=50',
             ),
           ),
           SizedBox(width: 16),
@@ -1645,24 +1580,17 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
                 SizedBox(height: 4),
                 Text(
                   '$count прослушиваний',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
                 ),
               ],
             ),
           ),
-          Icon(
-            Icons.play_circle_filled,
-            color: Colors.green,
-            size: 36,
-          ),
+          Icon(Icons.play_circle_filled, color: Colors.green, size: 36),
         ],
       ),
     );
   }
-  
+
   // Элемент настроек
   Widget _buildSettingsTile({
     required IconData icon,
@@ -1680,40 +1608,26 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: Colors.white,
-              size: 24,
-            ),
+            Icon(icon, color: Colors.white, size: 24),
             SizedBox(width: 16),
             Expanded(
               child: Text(
                 title,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 16),
               ),
             ),
             Text(
               value,
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 14,
-              ),
+              style: TextStyle(color: Colors.grey[400], fontSize: 14),
             ),
             SizedBox(width: 8),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.grey,
-              size: 16,
-            ),
+            Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
           ],
         ),
       ),
     );
   }
-  
+
   // Элемент настроек с переключателем
   Widget _buildSwitchTile({
     required IconData icon,
@@ -1729,31 +1643,24 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       ),
       child: Row(
         children: [
-          Icon(
-            icon,
-            color: Colors.white,
-            size: 24,
-          ),
+          Icon(icon, color: Colors.white, size: 24),
           SizedBox(width: 16),
           Expanded(
             child: Text(
               title,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: Colors.white, fontSize: 16),
             ),
           ),
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: Colors.green,
+            activeThumbColor: Colors.green,
           ),
         ],
       ),
     );
   }
-  
+
   // Элемент настроек с действием
   Widget _buildActionTile({
     required IconData icon,
@@ -1771,11 +1678,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: Colors.white,
-              size: 24,
-            ),
+            Icon(icon, color: Colors.white, size: 24),
             SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -1783,33 +1686,23 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 16),
                   ),
                   SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
                   ),
                 ],
               ),
             ),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.grey,
-              size: 16,
-            ),
+            Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
           ],
         ),
       ),
     );
   }
-  
+
   // Диалог выбора языка
   void _showLanguageDialog() {
     showDialog(
@@ -1817,10 +1710,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.grey[900],
-          title: Text(
-            'Выберите язык',
-            style: TextStyle(color: Colors.white),
-          ),
+          title: Text('Выберите язык', style: TextStyle(color: Colors.white)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1833,14 +1723,11 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       },
     );
   }
-  
+
   // Опция выбора языка
   Widget _buildLanguageOption(String language) {
     return ListTile(
-      title: Text(
-        language,
-        style: TextStyle(color: Colors.white),
-      ),
+      title: Text(language, style: TextStyle(color: Colors.white)),
       trailing: _userSettings['language'] == language
           ? Icon(Icons.check, color: Colors.green)
           : null,
@@ -1848,11 +1735,17 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
         setState(() {
           _userSettings['language'] = language;
         });
+        final locale = switch (language) {
+          'English' => const Locale('en'),
+          'Қазақша' => const Locale('kk'),
+          _ => const Locale('ru'),
+        };
+        unawaited(context.read<ThemeProvider>().setLocale(locale));
         Navigator.pop(context);
       },
     );
   }
-  
+
   // Диалог выбора качества аудио
   void _showAudioQualityDialog() {
     showDialog(
@@ -1860,10 +1753,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.grey[900],
-          title: Text(
-            'Качество аудио',
-            style: TextStyle(color: Colors.white),
-          ),
+          title: Text('Качество аудио', style: TextStyle(color: Colors.white)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1885,18 +1775,12 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       },
     );
   }
-  
+
   // Опция выбора качества аудио
   Widget _buildAudioQualityOption(String quality, String description) {
     return ListTile(
-      title: Text(
-        quality,
-        style: TextStyle(color: Colors.white),
-      ),
-      subtitle: Text(
-        description,
-        style: TextStyle(color: Colors.grey),
-      ),
+      title: Text(quality, style: TextStyle(color: Colors.white)),
+      subtitle: Text(description, style: TextStyle(color: Colors.grey)),
       trailing: _userSettings['audioQuality'] == quality
           ? Icon(Icons.check, color: Colors.green)
           : null,
@@ -1908,7 +1792,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       },
     );
   }
-  
+
   // Диалог очистки кэша
   void _showClearCacheDialog() {
     showDialog(
@@ -1916,10 +1800,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.grey[900],
-          title: Text(
-            'Очистить кэш?',
-            style: TextStyle(color: Colors.white),
-          ),
+          title: Text('Очистить кэш?', style: TextStyle(color: Colors.white)),
           content: Text(
             'Это действие удалит все временные файлы, но сохранит ваши плейлисты и настройки.',
             style: TextStyle(color: Colors.grey[300]),
@@ -1927,28 +1808,23 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Отмена',
-                style: TextStyle(color: Colors.grey),
-              ),
+              child: Text('Отмена', style: TextStyle(color: Colors.grey)),
             ),
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Кэш успешно очищен')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Кэш успешно очищен')));
               },
-              child: Text(
-                'Очистить',
-                style: TextStyle(color: Colors.green),
-              ),
+              child: Text('Очистить', style: TextStyle(color: Colors.green)),
             ),
           ],
         );
       },
     );
   }
+
   // Диалог "О приложении"
   void _showAboutDialog() {
     showDialog(
@@ -1956,10 +1832,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.grey[900],
-          title: Text(
-            'О приложении',
-            style: TextStyle(color: Colors.white),
-          ),
+          title: Text('О приложении', style: TextStyle(color: Colors.white)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1973,10 +1846,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
                 ),
               ),
               SizedBox(height: 8),
-              Text(
-                'Версия 1.0.0',
-                style: TextStyle(color: Colors.grey[400]),
-              ),
+              Text('Версия 1.0.0', style: TextStyle(color: Colors.grey[400])),
               SizedBox(height: 16),
               Text(
                 'Музыкальное приложение для воспроизведения, организации и обмена музыкой. Создавайте плейлисты, открывайте новую музыку и наслаждайтесь высоким качеством звучания.',
@@ -1992,10 +1862,7 @@ class _AccountScreenState extends State<AccountScreen> with SingleTickerProvider
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Закрыть',
-                style: TextStyle(color: Colors.green),
-              ),
+              child: Text('Закрыть', style: TextStyle(color: Colors.green)),
             ),
           ],
         );

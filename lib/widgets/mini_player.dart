@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class MiniPlayer extends StatelessWidget {
   final String trackName;
@@ -38,7 +39,7 @@ class MiniPlayer extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -53,19 +54,22 @@ class MiniPlayer extends StatelessWidget {
               margin: const EdgeInsets.only(left: 8),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(5),
-                image: coverImageUrl != null
-                    ? DecorationImage(
-                        image: NetworkImage(coverImageUrl!),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
                 color: Colors.grey[800],
               ),
               child: coverImageUrl == null
                   ? const Icon(Icons.music_note, color: Colors.white)
-                  : null,
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: CachedNetworkImage(
+                        imageUrl: coverImageUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => const Icon(Icons.music_note),
+                        errorWidget: (_, __, ___) =>
+                            const Icon(Icons.music_note),
+                      ),
+                    ),
             ),
-            
+
             // Track info
             Expanded(
               child: Padding(
@@ -85,10 +89,7 @@ class MiniPlayer extends StatelessWidget {
                     ),
                     Text(
                       artistName,
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.grey[400], fontSize: 12),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -96,7 +97,7 @@ class MiniPlayer extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             // Like button
             if (onLike != null)
               IconButton(
@@ -107,7 +108,7 @@ class MiniPlayer extends StatelessWidget {
                 ),
                 onPressed: onLike,
               ),
-            
+
             // Play/pause button
             IconButton(
               icon: isLoading
@@ -120,13 +121,15 @@ class MiniPlayer extends StatelessWidget {
                       ),
                     )
                   : Icon(
-                      isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                      isPlaying
+                          ? Icons.pause_circle_filled
+                          : Icons.play_circle_filled,
                       color: Colors.white,
                       size: 32,
                     ),
               onPressed: isLoading ? null : onPlayPause,
             ),
-            
+
             // Next button
             if (onNext != null)
               IconButton(

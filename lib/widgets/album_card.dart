@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class AlbumCard extends StatelessWidget {
   final int id;
@@ -23,64 +24,67 @@ class AlbumCard extends StatelessWidget {
       child: Container(
         width: 160,
         margin: const EdgeInsets.only(right: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Album cover
-            Container(
-              height: 160,
-              width: 160,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                image: imageUrl != null
-                    ? DecorationImage(
-                        image: NetworkImage(imageUrl!),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
-                color: Colors.grey[800],
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    offset: const Offset(0, 3),
-                    blurRadius: 8,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final cover = AspectRatio(aspectRatio: 1, child: _buildCover());
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (constraints.hasBoundedHeight)
+                  Flexible(child: cover)
+                else
+                  cover,
+                const SizedBox(height: 10),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
-                ],
-              ),
-              child: imageUrl == null
-                  ? Center(
-                      child: Icon(
-                        Icons.album,
-                        size: 60,
-                        color: Colors.grey[600],
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (subtitle != null)
-              Text(
-                subtitle!,
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 12,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-          ],
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
+
+  Widget _buildCover() => Container(
+    width: 160,
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(8),
+      color: Colors.grey[800],
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.3),
+          offset: const Offset(0, 3),
+          blurRadius: 8,
+        ),
+      ],
+    ),
+    child: imageUrl == null
+        ? Center(child: Icon(Icons.album, size: 60, color: Colors.grey[600]))
+        : ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: CachedNetworkImage(
+              imageUrl: imageUrl!,
+              fit: BoxFit.cover,
+              placeholder: (_, __) =>
+                  const Center(child: CircularProgressIndicator()),
+              errorWidget: (_, __, ___) => const Icon(Icons.album),
+            ),
+          ),
+  );
 }

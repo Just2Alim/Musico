@@ -43,4 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/build/
 node_modules
+.env
+.env.*
+!.env.example
+/lib/musico-server/.env
+android/key.properties
+android/app/upload-keystore.jks
+ios/Flutter/Local.xcconfig
+coverage/

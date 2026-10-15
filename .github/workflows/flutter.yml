@@ -1,0 +1,40 @@
+name: Flutter CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed lib test integration_test
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test --coverage
+      - run: ./tool/check_coverage.sh
+      - run: flutter build apk --debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: musico-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          script: flutter test integration_test/app_flow_test.dart

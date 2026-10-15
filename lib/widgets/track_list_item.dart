@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class TrackListItem extends StatelessWidget {
   final int id;
@@ -32,16 +33,10 @@ class TrackListItem extends StatelessWidget {
               width: 120,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                image: coverUrl != null
-                    ? DecorationImage(
-                        image: NetworkImage(coverUrl!),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
                 color: Colors.grey[800],
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     offset: const Offset(0, 3),
                     blurRadius: 8,
                   ),
@@ -55,7 +50,17 @@ class TrackListItem extends StatelessWidget {
                         color: Colors.grey[600],
                       ),
                     )
-                  : null,
+                  : ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CachedNetworkImage(
+                        imageUrl: coverUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) =>
+                            const Center(child: CircularProgressIndicator()),
+                        errorWidget: (_, __, ___) =>
+                            const Icon(Icons.music_note),
+                      ),
+                    ),
             ),
             const SizedBox(height: 10),
             Text(
@@ -70,10 +75,7 @@ class TrackListItem extends StatelessWidget {
             ),
             Text(
               artist,
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.grey[400], fontSize: 12),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

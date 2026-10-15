@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:graphql_flutter/graphql_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../graphql/graphql_config.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../data/supabase_config.dart';
 
 class RegisterScreen extends StatefulWidget {
   @override
@@ -14,7 +14,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  void _registerUser() async {
+  Future<void> _registerUser() async {
+    if (!SupabaseConfig.isConfigured) {
+      _showError('Настройте Supabase в .env.local и перезапустите приложение.');
+      return;
+    }
     final String name = _nameController.text.trim();
     final String email = _emailController.text.trim();
     final String password = _passwordController.text.trim();
@@ -26,48 +30,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _isLoading = true);
 
-    const String registerMutation = '''
-      mutation Register(\$name: String!, \$email: String!, \$password: String!) {
-        register(name: \$name, email: \$email, password: \$password) {
-          token
-          user {
-            id
-            name
-            email
-          }
-        }
-      }
-    ''';
-
-    final MutationOptions options = MutationOptions(
-      document: gql(registerMutation),
-      variables: {
-        'name': name,
-        'email': email,
-        'password': password,
-      },
-    );
-
-    final GraphQLClient client = GraphQLConfig.initClient();
-    final QueryResult result = await client.mutate(options);
-
-    setState(() => _isLoading = false);
-
-    if (result.hasException) {
-      _showError(result.exception.toString());
-    } else {
-      final authData = result.data?['register'];
-      if (authData != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', authData['token']);
-        await prefs.setInt('userId', authData['user']['id']);
-        await prefs.setString('name', authData['user']['name']);
-        await prefs.setString('email', authData['user']['email']);
-        
-        Navigator.pushReplacementNamed(context, '/home');
+    try {
+      final response = await Supabase.instance.client.auth.signUp(
+        email: email,
+        password: password,
+        data: {'display_name': name},
+      );
+      if (response.session != null && mounted) {
+        context.go('/home');
       } else {
-        _showError('Registration failed. Please try again.');
+        _showError('Проверьте почту и подтвердите регистрацию, затем войдите.');
       }
+    } on AuthException catch (error) {
+      _showError(error.message);
+    } catch (_) {
+      _showError(
+        'Сервис регистрации недоступен. Проверьте настройки Supabase и интернет.',
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -85,6 +66,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -159,7 +148,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       padding: const EdgeInsets.symmetric(
-                          vertical: 15, horizontal: 100),
+                        vertical: 15,
+                        horizontal: 100,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(30),
                       ),
@@ -172,7 +163,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 15),
             TextButton(
               onPressed: () {
-                Navigator.pushReplacementNamed(context, '/login');
+                context.go('/login');
               },
               child: const Text(
                 "Already have an account? Log in",

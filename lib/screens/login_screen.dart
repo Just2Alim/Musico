@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:graphql_flutter/graphql_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../graphql/graphql_config.dart';
+import 'package:flutter/foundation.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../data/supabase_config.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -13,7 +14,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  void _loginUser() async {
+  Future<void> _loginUser() async {
+    if (!SupabaseConfig.isConfigured) {
+      _showError('Настройте Supabase в .env.local и перезапустите приложение.');
+      return;
+    }
     final String email = _emailController.text.trim();
     final String password = _passwordController.text.trim();
 
@@ -24,47 +29,41 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    const String loginMutation = '''
-      mutation Login(\$email: String!, \$password: String!) {
-        login(email: \$email, password: \$password) {
-          token
-          user {
-            id
-            name
-            email
-          }
-        }
-      }
-    ''';
+    try {
+      await Supabase.instance.client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      if (mounted) context.go('/home');
+    } on AuthException catch (error) {
+      _showError(error.message);
+    } catch (_) {
+      _showError(
+        'Сервис входа недоступен. Проверьте настройки Supabase и интернет.',
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
-    final MutationOptions options = MutationOptions(
-      document: gql(loginMutation),
-      variables: {
-        'email': email,
-        'password': password,
-      },
-    );
-
-    final GraphQLClient client = GraphQLConfig.initClient();
-    final QueryResult result = await client.mutate(options);
-
-    setState(() => _isLoading = false);
-
-    if (result.hasException) {
-      _showError(result.exception.toString());
-    } else {
-      final authData = result.data?['login'];
-      if (authData != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', authData['token']);
-        await prefs.setInt('userId', authData['user']['id']);
-        await prefs.setString('name', authData['user']['name']);
-        await prefs.setString('email', authData['user']['email']);
-
-        Navigator.pushReplacementNamed(context, '/home');
-      } else {
-        _showError('Login failed. Please try again.');
-      }
+  Future<void> _loginWithGoogle() async {
+    if (!SupabaseConfig.isConfigured) {
+      _showError('Сначала настройте Supabase и Google OAuth provider.');
+      return;
+    }
+    try {
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: kIsWeb
+            ? Uri.base.toString()
+            : SupabaseConfig.authRedirectUrl,
+      );
+    } on AuthException catch (error) {
+      _showError(error.message);
+    } catch (_) {
+      _showError(
+        'Не удалось открыть Google вход. Проверьте OAuth redirect URL.',
+      );
     }
   }
 
@@ -82,6 +81,13 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -141,7 +147,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       padding: const EdgeInsets.symmetric(
-                          vertical: 15, horizontal: 100),
+                        vertical: 15,
+                        horizontal: 100,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(30),
                       ),
@@ -152,9 +160,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
             const SizedBox(height: 15),
+            OutlinedButton.icon(
+              onPressed: _loginWithGoogle,
+              icon: const Icon(Icons.login),
+              label: const Text('Continue with Google'),
+            ),
+            const SizedBox(height: 15),
             TextButton(
               onPressed: () {
-                Navigator.pushReplacementNamed(context, '/register');
+                context.push('/register');
               },
               child: const Text(
                 "Don't have an account? Sign up",

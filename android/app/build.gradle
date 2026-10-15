@@ -5,12 +5,25 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+def releaseKeyProperties = new Properties()
+def releaseKeyPropertiesFile = rootProject.file("key.properties")
+if (releaseKeyPropertiesFile.exists()) {
+    releaseKeyProperties.load(new FileInputStream(releaseKeyPropertiesFile))
+}
+def requiredReleaseProperties = ["keyAlias", "keyPassword", "storeFile", "storePassword"]
+def hasReleaseSigning = releaseKeyPropertiesFile.exists() &&
+        requiredReleaseProperties.every { releaseKeyProperties.getProperty(it) }
+def releaseTaskRequested = gradle.startParameter.taskNames.any {
+    it.toLowerCase().contains("release")
+}
+
 android {
-    namespace = "com.example.musico_app"
+    namespace = "com.just2alim.musico"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
+        coreLibraryDesugaringEnabled true
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
@@ -21,22 +34,43 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.musico_app"
+        applicationId = "com.just2alim.musico"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders = [
+            MAPS_API_KEY: System.getenv("GOOGLE_MAPS_API_KEY") ?: ""
+        ]
+    }
+
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                keyAlias = releaseKeyProperties["keyAlias"]
+                keyPassword = releaseKeyProperties["keyPassword"]
+                storeFile = file(releaseKeyProperties["storeFile"])
+                storePassword = releaseKeyProperties["storePassword"]
+            }
+        }
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            if (!hasReleaseSigning && releaseTaskRequested) {
+                throw new GradleException(
+                    "Configure android/key.properties with a private upload keystore before creating a release build."
+                )
+            }
+            signingConfig = hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
         }
     }
+}
+
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 }
 
 flutter {

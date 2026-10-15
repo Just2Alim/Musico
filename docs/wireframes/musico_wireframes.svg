@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1010" viewBox="0 0 1440 1010" role="img" aria-labelledby="title description">
+  <title id="title">Musico mobile screen wireframes</title>
+  <desc id="description">Four dark mobile screen sketches for Discover, Search, Player, and Library.</desc>
+  <defs>
+    <style>
+      .bg { fill: #07110d; }
+      .phone { fill: #0d1913; stroke: #375044; stroke-width: 2; }
+      .panel { fill: #14231b; }
+      .panel2 { fill: #1a2d22; }
+      .line { stroke: #476052; stroke-width: 2; }
+      .green { fill: #27d17f; }
+      .white { fill: #f4f7f4; font: 600 22px Arial, sans-serif; }
+      .muted { fill: #a8b6ad; font: 16px Arial, sans-serif; }
+      .small { fill: #9aaba0; font: 13px Arial, sans-serif; }
+      .label { fill: #27d17f; font: 700 18px Arial, sans-serif; letter-spacing: 1px; }
+      .title { fill: #f4f7f4; font: 700 38px Arial, sans-serif; }
+      .sub { fill: #a8b6ad; font: 18px Arial, sans-serif; }
+      .nav { fill: #a8b6ad; font: 12px Arial, sans-serif; }
+      .active { fill: #27d17f; font: 700 12px Arial, sans-serif; }
+    </style>
+  </defs>
+  <rect class="bg" width="1440" height="1010"/>
+  <text x="72" y="78" class="title">Musico</text>
+  <text x="72" y="112" class="sub">Mobile wireframes · topic 19 · first-pass screen structure</text>
+
+  <!-- Discover -->
+  <g transform="translate(72 166)">
+    <text x="0" y="0" class="label">01  DISCOVER</text>
+    <rect x="0" y="22" width="286" height="728" rx="32" class="phone"/>
+    <rect x="113" y="34" width="60" height="6" rx="3" fill="#53655a"/>
+    <text x="22" y="86" class="white">Добрый вечер</text>
+    <text x="22" y="116" class="muted">Найди свой следующий трек</text>
+    <rect x="22" y="144" width="242" height="44" rx="12" class="panel"/>
+    <circle cx="42" cy="166" r="7" fill="none" stroke="#a8b6ad" stroke-width="2"/>
+    <line x1="47" y1="171" x2="53" y2="177" class="line"/>
+    <text x="62" y="172" class="small">Поиск треков и артистов</text>
+    <text x="22" y="226" class="white">Популярное</text>
+    <rect x="22" y="244" width="242" height="164" rx="16" class="panel2"/>
+    <rect x="34" y="256" width="92" height="92" rx="12" fill="#284832"/>
+    <circle cx="79" cy="302" r="25" fill="#27d17f" opacity=".7"/>
+    <text x="140" y="282" class="small">ПЛЕЙЛИСТ</text>
+    <text x="140" y="311" class="white">Night Drive</text>
+    <text x="140" y="338" class="small">12 треков</text>
+    <text x="34" y="379" class="muted">Подборка для вечерней прогулки</text>
+    <text x="22" y="454" class="white">Недавно добавлены</text>
+    <g>
+      <rect x="22" y="470" width="242" height="54" rx="12" class="panel"/>
+      <rect x="30" y="478" width="38" height="38" rx="8" fill="#325543"/>
+      <text x="78" y="495" class="muted">North · Aster</text><text x="78" y="514" class="small">3:24</text>
+      <rect x="22" y="532" width="242" height="54" rx="12" class="panel"/>
+      <rect x="30" y="540" width="38" height="38" rx="8" fill="#533a54"/>
+      <text x="78" y="557" class="muted">South · Mira</text><text x="78" y="576" class="small">2:58</text>
+    </g>
+    <rect x="22" y="610" width="242" height="52" rx="14" class="panel2"/>
+    <circle cx="48" cy="636" r="17" fill="#284832"/>
+    <text x="76" y="633" class="muted">North</text><text x="76" y="651" class="small">Aster</text>
+    <text x="222" y="644" class="white">▶</text>
+    <line x1="22" y1="681" x2="264" y2="681" class="line"/>
+    <text x="35" y="708" class="active">Главная</text><text x="101" y="708" class="nav">Поиск</text><text x="159" y="708" class="nav">Моя музыка</text><text x="230" y="708" class="nav">Профиль</text>
+  </g>
+
+  <!-- Search -->
+  <g transform="translate(414 166)">
+    <text x="0" y="0" class="label">02  SEARCH</text>
+    <rect x="0" y="22" width="286" height="728" rx="32" class="phone"/>
+    <rect x="113" y="34" width="60" height="6" rx="3" fill="#53655a"/>
+    <text x="22" y="88" class="white">Поиск</text>
+    <rect x="22" y="108" width="242" height="46" rx="12" class="panel"/>
+    <circle cx="42" cy="130" r="7" fill="none" stroke="#27d17f" stroke-width="2"/>
+    <line x1="47" y1="135" x2="53" y2="141" stroke="#27d17f" stroke-width="2"/>
+    <text x="64" y="136" class="muted">Aster</text><text x="242" y="136" class="muted">×</text>
+    <text x="22" y="194" class="small">ТРЕКИ</text>
+    <g>
+      <rect x="22" y="208" width="242" height="62" rx="12" class="panel"/>
+      <rect x="30" y="216" width="46" height="46" rx="8" fill="#325543"/>
+      <text x="88" y="235" class="muted">North</text><text x="88" y="255" class="small">Aster · 3:24</text><text x="236" y="246" class="muted">♡</text>
+      <rect x="22" y="278" width="242" height="62" rx="12" class="panel"/>
+      <rect x="30" y="286" width="46" height="46" rx="8" fill="#31515a"/>
+      <text x="88" y="305" class="muted">Blue Hour</text><text x="88" y="325" class="small">Aster · 4:01</text><text x="236" y="316" class="muted">♡</text>
+    </g>
+    <text x="22" y="386" class="small">АРТИСТЫ</text>
+    <circle cx="57" cy="432" r="26" fill="#315c45"/>
+    <text x="94" y="428" class="muted">Aster</text><text x="94" y="449" class="small">4 композиции</text>
+    <text x="22" y="504" class="small">ПЛЕЙЛИСТЫ</text>
+    <rect x="22" y="520" width="242" height="62" rx="12" class="panel"/>
+    <rect x="30" y="528" width="46" height="46" rx="8" fill="#59434a"/>
+    <text x="88" y="547" class="muted">Night Drive</text><text x="88" y="567" class="small">Создан вами · 12 треков</text>
+    <rect x="22" y="610" width="242" height="52" rx="14" class="panel2"/>
+    <circle cx="48" cy="636" r="17" fill="#284832"/><text x="76" y="633" class="muted">North</text><text x="76" y="651" class="small">Aster</text><text x="222" y="644" class="white">▶</text>
+    <line x1="22" y1="681" x2="264" y2="681" class="line"/>
+    <text x="35" y="708" class="nav">Главная</text><text x="101" y="708" class="active">Поиск</text><text x="159" y="708" class="nav">Моя музыка</text><text x="230" y="708" class="nav">Профиль</text>
+  </g>
+
+  <!-- Player -->
+  <g transform="translate(756 166)">
+    <text x="0" y="0" class="label">03  PLAYER</text>
+    <rect x="0" y="22" width="286" height="728" rx="32" class="phone"/>
+    <rect x="113" y="34" width="60" height="6" rx="3" fill="#53655a"/>
+    <text x="22" y="86" class="muted">‹  Сейчас играет</text>
+    <rect x="28" y="126" width="230" height="230" rx="24" fill="#284832"/>
+    <circle cx="143" cy="241" r="70" fill="#27d17f" opacity=".65"/>
+    <circle cx="143" cy="241" r="40" fill="#1b3424"/>
+    <text x="22" y="410" class="white">North</text><text x="22" y="440" class="muted">Aster</text><text x="236" y="430" class="green" font-size="25">♥</text>
+    <rect x="22" y="472" width="242" height="4" rx="2" fill="#476052"/><rect x="22" y="472" width="113" height="4" rx="2" class="green"/>
+    <text x="22" y="500" class="small">1:36</text><text x="230" y="500" class="small">3:24</text>
+    <text x="40" y="564" class="muted" font-size="27">⟲</text><text x="92" y="564" class="white" font-size="25">◀</text><circle cx="143" cy="554" r="31" class="green"/><text x="133" y="563" fill="#07110d" font-size="22">Ⅱ</text><text x="184" y="564" class="white" font-size="25">▶</text><text x="234" y="564" class="muted" font-size="27">⇄</text>
+    <rect x="22" y="610" width="242" height="52" rx="14" class="panel2"/>
+    <text x="38" y="642" class="muted">Воспроизведение продолжается</text>
+    <line x1="22" y1="681" x2="264" y2="681" class="line"/>
+    <text x="35" y="708" class="nav">Главная</text><text x="101" y="708" class="nav">Поиск</text><text x="159" y="708" class="active">Моя музыка</text><text x="230" y="708" class="nav">Профиль</text>
+  </g>
+
+  <!-- Library -->
+  <g transform="translate(1098 166)">
+    <text x="0" y="0" class="label">04  LIBRARY</text>
+    <rect x="0" y="22" width="286" height="728" rx="32" class="phone"/>
+    <rect x="113" y="34" width="60" height="6" rx="3" fill="#53655a"/>
+    <text x="22" y="88" class="white">Моя музыка</text>
+    <rect x="22" y="112" width="242" height="42" rx="12" class="panel"/>
+    <text x="40" y="139" class="active">Плейлисты</text><text x="144" y="139" class="small">Избранное</text><text x="220" y="139" class="small">История</text>
+    <rect x="22" y="174" width="242" height="50" rx="12" class="panel2"/>
+    <text x="40" y="205" class="green" font-size="20">＋</text><text x="70" y="205" class="muted">Создать плейлист</text>
+    <g>
+      <rect x="22" y="244" width="114" height="142" rx="14" class="panel"/>
+      <rect x="30" y="252" width="98" height="82" rx="10" fill="#284832"/>
+      <circle cx="79" cy="293" r="24" fill="#27d17f" opacity=".6"/>
+      <text x="32" y="358" class="muted">Night Drive</text><text x="32" y="378" class="small">12 треков</text>
+      <rect x="150" y="244" width="114" height="142" rx="14" class="panel"/>
+      <rect x="158" y="252" width="98" height="82" rx="10" fill="#473c55"/>
+      <circle cx="207" cy="293" r="24" fill="#aa79c8" opacity=".65"/>
+      <text x="160" y="358" class="muted">Favorites</text><text x="160" y="378" class="small">8 треков</text>
+      <rect x="22" y="400" width="114" height="142" rx="14" class="panel"/>
+      <rect x="30" y="408" width="98" height="82" rx="10" fill="#344c57"/>
+      <circle cx="79" cy="449" r="24" fill="#5bb8bc" opacity=".65"/>
+      <text x="32" y="514" class="muted">Focus</text><text x="32" y="534" class="small">5 треков</text>
+    </g>
+    <rect x="22" y="610" width="242" height="52" rx="14" class="panel2"/>
+    <circle cx="48" cy="636" r="17" fill="#284832"/><text x="76" y="633" class="muted">North</text><text x="76" y="651" class="small">Aster</text><text x="222" y="644" class="white">▶</text>
+    <line x1="22" y1="681" x2="264" y2="681" class="line"/>
+    <text x="35" y="708" class="nav">Главная</text><text x="101" y="708" class="nav">Поиск</text><text x="159" y="708" class="active">Моя музыка</text><text x="230" y="708" class="nav">Профиль</text>
+  </g>
+
+  <text x="72" y="960" class="small">Эскизы задают структуру и ключевые элементы. Реализованные состояния и оформление могут отличаться по мере настройки проекта.</text>
+</svg>

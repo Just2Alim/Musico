@@ -1,0 +1,2 @@
+[functions.report-crash]
+verify_jwt = true

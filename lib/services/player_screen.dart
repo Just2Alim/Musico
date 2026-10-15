@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui';
-import '../providers/AudioPlayerAlternativeProvider.dart';
-import 'package:graphql_flutter/graphql_flutter.dart';
-import '../graphql/graphql_config.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/audio_player_provider.dart';
+import '../features/player/playback_cubit.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../data/music_repository.dart';
+import '../widgets/music_credit.dart';
+import '../widgets/playback_progress.dart';
 
 class PlayerScreen extends StatefulWidget {
   final Map<String, dynamic> arguments;
@@ -15,10 +18,8 @@ class PlayerScreen extends StatefulWidget {
   _PlayerScreenState createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver {
-  bool _isShuffleEnabled = false;
-  bool _isRepeatEnabled = false;
-  bool _showBottomSheet = false;
+class _PlayerScreenState extends State<PlayerScreen>
+    with WidgetsBindingObserver {
   List<dynamic> _userPlaylists = [];
   bool _isLoadingPlaylists = false;
 
@@ -44,19 +45,15 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   }
 
   Future<void> _checkUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('userId');
-    final token = prefs.getString('token');
-    print('Current user ID: $userId');
-    print('Auth token: ${token != null ? 'Available' : 'Not available'}');
+    // Supabase manages the persisted authentication session.
   }
 
   void _loadTrack() {
     final int trackId = widget.arguments['trackId'];
     // Загружаем трек через провайдер
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<AudioPlayerAlternativeProvider>(context, listen: false)
-          .loadTrackById(trackId);
+      if (!mounted) return;
+      context.read<PlaybackCubit>().loadTrackById(trackId);
     });
   }
 
@@ -67,8 +64,15 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     return "$minutes:$seconds";
   }
 
-  Future<void> _toggleFavorite(Track track, AudioPlayerAlternativeProvider provider) async {
+  Future<void> _toggleFavorite(
+    Track track,
+    AudioPlayerAlternativeProvider provider,
+  ) async {
     await provider.toggleFavorite();
+    if (!mounted || provider.errorMessage.isEmpty) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(provider.errorMessage)));
   }
 
   Future<void> _loadUserPlaylists() async {
@@ -77,119 +81,51 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     });
 
     try {
-      // Получаем ID текущего пользователя из SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getInt('userId');
-      
-      if (userId == null) {
-        print('_loadUserPlaylists: userId is null');
-        setState(() {
-          _isLoadingPlaylists = false;
-        });
-        return;
-      }
-      
-      print('Loading playlists for userId: $userId');
-
-      // Изменим запрос, чтобы передавать userId как переменную
-      const String playlistsQuery = '''
-        query GetUserPlaylists(\$userId: Int!) {
-          playlists(userId: \$userId) {
-            id
-            name
-            subtitle
-            imageUrl
-            trackCount
-          }
-        }
-      ''';
-
-      final QueryOptions options = QueryOptions(
-        document: gql(playlistsQuery),
-        variables: {
-          'userId': userId,
-        },
-        fetchPolicy: FetchPolicy.networkOnly, // Отключаем кэширование для получения актуальных данных
+      // Read playlists for the active Supabase user.
+      final playlists = await context.read<MusicRepository>().playlists(
+        ownerId: Supabase.instance.client.auth.currentUser?.id,
       );
-
-      final GraphQLClient client = GraphQLConfig.initClient();
-      print('GraphQL client initialized');
-      
-      final QueryResult result = await client.query(options);
-      print('Query executed');
-
-      if (result.hasException) {
-        print('Error in query: ${result.exception?.toString()}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading playlists: ${result.exception.toString()}')),
-        );
-      } else {
-        print('Query result: ${result.data}');
-        final playlists = result.data?['playlists'];
-        print('Playlists received: $playlists');
-        
-        setState(() {
-          _userPlaylists = playlists ?? [];
-        });
-        
-        print('Playlists state updated: $_userPlaylists');
-      }
+      if (!mounted) return;
+      _userPlaylists = playlists;
     } catch (e) {
+      if (!mounted) return;
       print('Exception in _loadUserPlaylists: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load playlists: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load playlists: $e')));
     } finally {
-      setState(() {
-        _isLoadingPlaylists = false;
-      });
+      if (mounted) {
+        setState(() => _isLoadingPlaylists = false);
+      }
     }
   }
 
   Future<void> _addToPlaylist(int trackId, int playlistId) async {
     try {
       print('Adding track $trackId to playlist $playlistId');
-      
-      const String mutation = '''
-        mutation AddTrackToPlaylist(\$playlistId: Int!, \$trackId: Int!) {
-          addTrackToPlaylist(playlistId: \$playlistId, trackId: \$trackId)
-        }
-      ''';
 
-      final GraphQLClient client = GraphQLConfig.initClient();
-      final QueryResult result = await client.mutate(
-        MutationOptions(
-          document: gql(mutation),
-          variables: {
-            'playlistId': playlistId,
-            'trackId': trackId,
-          },
-        ),
-      );
-
-      if (result.hasException) {
-        print('Error adding track to playlist: ${result.exception.toString()}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка при добавлении трека: ${result.exception.toString()}')),
-        );
-      } else {
+      await context.read<MusicRepository>().addTrack(playlistId, trackId);
+      if (!mounted) return;
+      {
         print('Track successfully added to playlist');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Трек добавлен в плейлист')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Трек добавлен в плейлист')));
         Navigator.pop(context); // Закрываем bottom sheet
       }
     } catch (e) {
+      if (!mounted) return;
       print('Exception when adding track to playlist: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Произошла ошибка: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Произошла ошибка: $e')));
     }
   }
 
   void _showOptionsBottomSheet(BuildContext context, Track track) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.grey[900],
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -197,84 +133,146 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    'Опции трека',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      'Опции трека',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-                const Divider(color: Colors.grey),
-                ListTile(
-                  leading: const Icon(Icons.queue_music, color: Colors.white),
-                  title: const Text('В очередь воспроизведения', style: TextStyle(color: Colors.white)),
-                  onTap: () {
-                    // Добавляем трек в очередь воспроизведения
-                    Provider.of<AudioPlayerAlternativeProvider>(context, listen: false).addToQueue(track);
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Трек добавлен в очередь воспроизведения')),
-                    );
-                  },
-                ),
-                Consumer<AudioPlayerAlternativeProvider>(
-                  builder: (context, provider, child) {
-                    return ListTile(
-                      leading: Icon(
-                        track.isLiked ? Icons.favorite : Icons.favorite_border, 
-                        color: track.isLiked ? Colors.green : Colors.white
+                  const Divider(color: Colors.grey),
+                  if (MusicCredit.supports(track))
+                    ListTile(
+                      leading: const Icon(Icons.copyright, color: Colors.white),
+                      title: const Text(
+                        'Авторство и лицензия',
+                        style: TextStyle(color: Colors.white),
                       ),
-                      title: Text(
-                        track.isLiked ? 'Удалить из избранного' : 'Добавить в избранное', 
-                        style: TextStyle(color: Colors.white)
+                      subtitle: const Text(
+                        'Kevin MacLeod · CC BY 4.0',
+                        style: TextStyle(color: Colors.white70),
                       ),
-                      onTap: () async {
-                        await _toggleFavorite(track, provider);
-                        Navigator.pop(context);
-                      },
-                    );
-                  }
-                ),
-                ListTile(
-                  leading: const Icon(Icons.share, color: Colors.white),
-                  title: const Text('Поделиться', style: TextStyle(color: Colors.white)),
-                  onTap: () {
-                    // Логика для функции "Поделиться"
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Функция "Поделиться" будет доступна в ближайшем обновлении')),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.info_outline, color: Colors.white),
-                  title: const Text('Информация о треке', style: TextStyle(color: Colors.white)),
-                  onTap: () {
-                    // Логика для функции "Информация о треке"
-                    Navigator.pop(context);
-                    _showTrackInfoDialog(context, track);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.playlist_add, color: Colors.white),
-                  title: const Text('Добавить в плейлист', style: TextStyle(color: Colors.white)),
-                  onTap: () {
-                    // Закрываем текущий bottom sheet
-                    Navigator.pop(context);
-                    
-                    // Открываем новый bottom sheet для выбора плейлиста
-                    _showAddToPlaylistBottomSheet(context, track);
-                  },
-                ),
-                const SizedBox(height: 20),
-              ],
+                      onTap: () => showDialog<void>(
+                        context: context,
+                        builder: (dialogContext) => AlertDialog(
+                          title: const Text('Авторство и лицензия'),
+                          content: SingleChildScrollView(
+                            child: MusicCredit(track: track),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dialogContext),
+                              child: const Text('Закрыть'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ListTile(
+                    leading: const Icon(Icons.queue_music, color: Colors.white),
+                    title: const Text(
+                      'В очередь воспроизведения',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    onTap: () {
+                      // Добавляем трек в очередь воспроизведения
+                      Provider.of<AudioPlayerAlternativeProvider>(
+                        context,
+                        listen: false,
+                      ).addToQueue(track);
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Трек добавлен в очередь воспроизведения',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  Consumer<AudioPlayerAlternativeProvider>(
+                    builder: (context, provider, child) {
+                      return ListTile(
+                        leading: Icon(
+                          track.isLiked
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: track.isLiked ? Colors.green : Colors.white,
+                        ),
+                        title: Text(
+                          track.isLiked
+                              ? 'Удалить из избранного'
+                              : 'Добавить в избранное',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        onTap: () async {
+                          await _toggleFavorite(track, provider);
+                          Navigator.pop(context);
+                        },
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.share, color: Colors.white),
+                    title: const Text(
+                      'Поделиться',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    onTap: () {
+                      // Логика для функции "Поделиться"
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Функция "Поделиться" будет доступна в ближайшем обновлении',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.info_outline,
+                      color: Colors.white,
+                    ),
+                    title: const Text(
+                      'Информация о треке',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    onTap: () {
+                      // Логика для функции "Информация о треке"
+                      Navigator.pop(context);
+                      _showTrackInfoDialog(context, track);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.playlist_add,
+                      color: Colors.white,
+                    ),
+                    title: const Text(
+                      'Добавить в плейлист',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    onTap: () {
+                      // Закрываем текущий bottom sheet
+                      Navigator.pop(context);
+
+                      // Открываем новый bottom sheet для выбора плейлиста
+                      _showAddToPlaylistBottomSheet(context, track);
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
             );
           },
         );
@@ -282,12 +280,21 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     );
   }
 
-  void _showAddToPlaylistBottomSheet(BuildContext context, Track track) {
-    // Загружаем плейлисты пользователя, если они еще не загружены
-    if (_userPlaylists.isEmpty && !_isLoadingPlaylists) {
-      _loadUserPlaylists();
+  Future<void> _showAddToPlaylistBottomSheet(
+    BuildContext unused,
+    Track track,
+  ) async {
+    if (Supabase.instance.client.auth.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Войдите, чтобы добавлять треки в плейлисты.'),
+        ),
+      );
+      return;
     }
-    
+    await _loadUserPlaylists();
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
@@ -312,66 +319,80 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                   ),
                 ),
                 const Divider(color: Colors.grey),
-                
+
                 // Опция создания нового плейлиста
                 ListTile(
-                  leading: const Icon(Icons.add_circle_outline, color: Colors.green),
-                  title: const Text('Создать новый плейлист', style: TextStyle(color: Colors.white)),
+                  leading: const Icon(
+                    Icons.add_circle_outline,
+                    color: Colors.green,
+                  ),
+                  title: const Text(
+                    'Создать новый плейлист',
+                    style: TextStyle(color: Colors.white),
+                  ),
                   onTap: () {
                     Navigator.pop(context);
                     _showCreatePlaylistDialog(context, track);
                   },
                 ),
-                
+
                 const Divider(color: Colors.grey),
-                
+
                 // Список существующих плейлистов
                 Expanded(
-                  child: _isLoadingPlaylists 
-                      ? const Center(child: CircularProgressIndicator(color: Colors.green))
+                  child: _isLoadingPlaylists
+                      ? const Center(
+                          child: CircularProgressIndicator(color: Colors.green),
+                        )
                       : _userPlaylists.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'У вас пока нет плейлистов',
-                                style: TextStyle(color: Colors.grey),
+                      ? const Center(
+                          child: Text(
+                            'У вас пока нет плейлистов',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _userPlaylists.length,
+                          itemBuilder: (context, index) {
+                            final playlist = _userPlaylists[index];
+                            return ListTile(
+                              leading: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(4),
+                                  image: playlist['imageUrl'] != null
+                                      ? DecorationImage(
+                                          image: NetworkImage(
+                                            playlist['imageUrl'],
+                                          ),
+                                          fit: BoxFit.cover,
+                                        )
+                                      : null,
+                                  color: Colors.grey[800],
+                                ),
+                                child: playlist['imageUrl'] == null
+                                    ? const Icon(
+                                        Icons.music_note,
+                                        color: Colors.white,
+                                        size: 24,
+                                      )
+                                    : null,
                               ),
-                            )
-                          : ListView.builder(
-                              itemCount: _userPlaylists.length,
-                              itemBuilder: (context, index) {
-                                final playlist = _userPlaylists[index];
-                                return ListTile(
-                                  leading: Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(4),
-                                      image: playlist['imageUrl'] != null
-                                          ? DecorationImage(
-                                              image: NetworkImage(playlist['imageUrl']),
-                                              fit: BoxFit.cover,
-                                            )
-                                          : null,
-                                      color: Colors.grey[800],
-                                    ),
-                                    child: playlist['imageUrl'] == null
-                                        ? const Icon(Icons.music_note, color: Colors.white, size: 24)
-                                        : null,
-                                  ),
-                                  title: Text(
-                                    playlist['name'] ?? 'Без названия',
-                                    style: const TextStyle(color: Colors.white),
-                                  ),
-                                  subtitle: Text(
-                                    '${playlist['trackCount'] ?? 0} треков',
-                                    style: TextStyle(color: Colors.grey[400]),
-                                  ),
-                                  onTap: () {
-                                    _addToPlaylist(track.id, playlist['id']);
-                                  },
-                                );
+                              title: Text(
+                                playlist['name'] ?? 'Без названия',
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              subtitle: Text(
+                                '${playlist['track_count'] ?? playlist['trackCount'] ?? 0} треков',
+                                style: TextStyle(color: Colors.grey[400]),
+                              ),
+                              onTap: () {
+                                _addToPlaylist(track.id, playlist['id']);
                               },
-                            ),
+                            );
+                          },
+                        ),
                 ),
               ],
             );
@@ -381,9 +402,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     );
   }
 
-  void _showCreatePlaylistDialog(BuildContext context, Track track) {
+  void _showCreatePlaylistDialog(BuildContext unused, Track track) {
     final TextEditingController nameController = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -416,11 +437,17 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
               onPressed: () async {
                 if (nameController.text.trim().isNotEmpty) {
                   // Создаем плейлист и добавляем в него трек
-                  await _createPlaylistAndAddTrack(nameController.text.trim(), track.id);
-                  Navigator.pop(context);
+                  await _createPlaylistAndAddTrack(
+                    nameController.text.trim(),
+                    track.id,
+                  );
+                  if (context.mounted) Navigator.pop(context);
                 }
               },
-              child: const Text('Создать', style: TextStyle(color: Colors.green)),
+              child: const Text(
+                'Создать',
+                style: TextStyle(color: Colors.green),
+              ),
             ),
           ],
         );
@@ -431,82 +458,14 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Future<void> _createPlaylistAndAddTrack(String name, int trackId) async {
     try {
       print('Creating playlist "$name" and adding track $trackId');
-      
+
       // Создаем плейлист
-      const String createPlaylistMutation = '''
-        mutation CreatePlaylist(\$name: String!) {
-          createPlaylist(name: \$name) {
-            id
-            name
-            subtitle
-            imageUrl
-            trackCount
-            userId
-          }
-        }
-      ''';
-
-      final GraphQLClient client = GraphQLConfig.initClient();
-      final QueryResult createResult = await client.mutate(
-        MutationOptions(
-          document: gql(createPlaylistMutation),
-          variables: {
-            'name': name,
-          },
-        ),
+      final playlistId = await context.read<MusicRepository>().createPlaylist(
+        name,
       );
+      await context.read<MusicRepository>().addTrack(playlistId, trackId);
+      if (!mounted) return;
 
-      if (createResult.hasException) {
-        print('Error creating playlist: ${createResult.exception.toString()}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка при создании плейлиста: ${createResult.exception.toString()}')),
-        );
-        return;
-      }
-
-      print('Playlist created successfully: ${createResult.data?['createPlaylist']}');
-      
-      // Получаем ID созданного плейлиста
-      final playlistData = createResult.data?['createPlaylist'];
-      if (playlistData == null) {
-        print('No playlist data returned from server');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: данные плейлиста не получены')),
-        );
-        return;
-      }
-      
-      final int playlistId = playlistData['id'];
-      print('Using playlist ID: $playlistId');
-
-      // Добавляем трек в созданный плейлист
-      const String addTrackMutation = '''
-        mutation AddTrackToPlaylist(\$playlistId: Int!, \$trackId: Int!) {
-          addTrackToPlaylist(playlistId: \$playlistId, trackId: \$trackId)
-        }
-      ''';
-
-      print('Adding track $trackId to playlist $playlistId');
-      final QueryResult addResult = await client.mutate(
-        MutationOptions(
-          document: gql(addTrackMutation),
-          variables: {
-            'playlistId': playlistId,
-            'trackId': trackId,
-          },
-        ),
-      );
-
-      if (addResult.hasException) {
-        print('Error adding track to playlist: ${addResult.exception.toString()}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка при добавлении трека в плейлист: ${addResult.exception.toString()}')),
-        );
-        return;
-      }
-
-      print('Track successfully added to playlist');
-      
       // Обновляем список плейлистов
       _loadUserPlaylists();
 
@@ -514,14 +473,15 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         SnackBar(content: Text('Плейлист "$name" создан и трек добавлен')),
       );
     } catch (e) {
+      if (!mounted) return;
       print('Exception when creating playlist and adding track: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Произошла ошибка: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Произошла ошибка: $e')));
     }
   }
 
-  void _showTrackInfoDialog(BuildContext context, Track track) {
+  void _showTrackInfoDialog(BuildContext unused, Track track) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -539,7 +499,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
               const SizedBox(height: 8),
               _infoRow('Исполнитель', track.artist),
               const SizedBox(height: 8),
-              _infoRow('Длительность', _formatDuration(Duration(seconds: track.duration))),
+              _infoRow(
+                'Длительность',
+                _formatDuration(Duration(seconds: track.duration)),
+              ),
               if (track.genre != null && track.genre!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 _infoRow('Жанр', track.genre!),
@@ -551,7 +514,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Закрыть', style: TextStyle(color: Colors.green)),
+              child: const Text(
+                'Закрыть',
+                style: TextStyle(color: Colors.green),
+              ),
             ),
           ],
         );
@@ -571,10 +537,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
           ),
         ),
         Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(color: Colors.white),
-          ),
+          child: Text(value, style: const TextStyle(color: Colors.white)),
         ),
       ],
     );
@@ -582,50 +545,75 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AudioPlayerAlternativeProvider>(
-      builder: (context, audioProvider, child) {
-        final track = audioProvider.currentTrack;
-        final isLoading = audioProvider.isLoading;
-        final isPlaying = audioProvider.isPlaying;
-        final position = audioProvider.position;
-        final duration = audioProvider.duration;
+    return BlocBuilder<PlaybackCubit, PlaybackState>(
+      builder: (context, playback) {
+        final track = playback.currentTrack;
+        final isLoading = playback.isLoading;
+        final isPlaying = playback.isPlaying;
+        final position = playback.position;
+        final duration = playback.duration;
 
         return Scaffold(
           backgroundColor: Colors.black,
           body: track == null
-              ? const Center(child: CircularProgressIndicator())
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (playback.errorMessage.isEmpty)
+                        const CircularProgressIndicator()
+                      else ...[
+                        Text(playback.errorMessage),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                          onPressed: () =>
+                              context.read<PlaybackCubit>().loadTrackById(
+                                widget.arguments['trackId'] as int,
+                              ),
+                          child: const Text('Повторить'),
+                        ),
+                      ],
+                    ],
+                  ),
+                )
               : Stack(
                   children: [
                     // Background with blur
                     Container(
                       decoration: BoxDecoration(
-                        image: DecorationImage(
-                          image: track.coverImageUrl != null
-                              ? NetworkImage(track.coverImageUrl!)
-                              : const AssetImage('assets/images/default_cover.jpg') as ImageProvider,
-                          fit: BoxFit.cover,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xff174c43), Color(0xff15131e)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
                       ),
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
                         child: Container(
-                          color: Colors.black.withOpacity(0.7),
+                          color: Colors.black.withValues(alpha: 0.7),
                         ),
                       ),
                     ),
-                    
+
                     // Content
                     SafeArea(
                       child: Column(
                         children: [
                           // App bar
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                              vertical: 8.0,
+                            ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 30),
+                                  icon: const Icon(
+                                    Icons.keyboard_arrow_down,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
                                   onPressed: () => Navigator.pop(context),
                                 ),
                                 const Text(
@@ -636,7 +624,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.more_vert, color: Colors.white),
+                                  icon: const Icon(
+                                    Icons.more_vert,
+                                    color: Colors.white,
+                                  ),
                                   onPressed: () {
                                     _showOptionsBottomSheet(context, track);
                                   },
@@ -644,7 +635,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                               ],
                             ),
                           ),
-                          
+
                           // Album art
                           Expanded(
                             flex: 4,
@@ -655,37 +646,68 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                                   borderRadius: BorderRadius.circular(15),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.3),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.3,
+                                      ),
                                       spreadRadius: 1,
                                       blurRadius: 15,
                                       offset: const Offset(0, 5),
                                     ),
                                   ],
-                                  image: DecorationImage(
-                                    image: track.coverImageUrl != null
-                                      ? NetworkImage(track.coverImageUrl!)
-                                      : const AssetImage('assets/images/default_cover.jpg') as ImageProvider,
-                                    fit: BoxFit.cover,
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xff287b65),
+                                      Color(0xff292040),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
                                 ),
+                                child: track.coverImageUrl?.isNotEmpty == true
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(15),
+                                        child: Image.network(
+                                          track.coverImageUrl!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Center(
+                                                child: Icon(
+                                                  Icons.music_note,
+                                                  size: 100,
+                                                  color: Colors.white70,
+                                                ),
+                                              ),
+                                        ),
+                                      )
+                                    : const Center(
+                                        child: Icon(
+                                          Icons.music_note,
+                                          size: 100,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
                               ),
                             ),
                           ),
-                          
+
                           // Track info
                           Expanded(
                             flex: 3,
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 30.0),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 30.0,
+                              ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               track.name,
@@ -712,35 +734,43 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                                       ),
                                       IconButton(
                                         icon: Icon(
-                                          track.isLiked ? Icons.favorite : Icons.favorite_border,
-                                          color: track.isLiked ? Colors.green : Colors.white,
+                                          track.isLiked
+                                              ? Icons.favorite
+                                              : Icons.favorite_border,
+                                          color: track.isLiked
+                                              ? Colors.green
+                                              : Colors.white,
                                           size: 30,
                                         ),
-                                        onPressed: () => _toggleFavorite(track, audioProvider),
+                                        onPressed: () => _toggleFavorite(
+                                          track,
+                                          context
+                                              .read<
+                                                AudioPlayerAlternativeProvider
+                                              >(),
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  
+
                                   // Progress slider
                                   const SizedBox(height: 30),
-                                  Slider(
-                                    value: position.inSeconds.toDouble(),
-                                    min: 0,
-                                    max: duration.inSeconds.toDouble() > 0 
-                                        ? duration.inSeconds.toDouble() 
-                                        : 1.0,
-                                    onChanged: (value) {
-                                      audioProvider.seekTo(Duration(seconds: value.toInt()));
-                                    },
-                                    activeColor: Colors.green,
-                                    inactiveColor: Colors.grey[800],
+                                  PlaybackProgress(
+                                    position: position,
+                                    duration: duration,
+                                    onSeek: context
+                                        .read<PlaybackCubit>()
+                                        .seekTo,
                                   ),
-                                  
+
                                   // Time indicators
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20.0,
+                                    ),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
                                           _formatDuration(position),
@@ -759,63 +789,100 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                                       ],
                                     ),
                                   ),
-                                  
+
                                   // Playback controls
                                   Expanded(
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
                                       children: [
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.shuffle,
-                                      color: audioProvider.shuffleEnabled ? Colors.green : Colors.white,
-                                    ),
-                                    onPressed: () {
-                                      // Обновляем состояние провайдера вместо локального состояния
-                                      audioProvider.toggleShuffleMode();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(audioProvider.shuffleEnabled 
-                                            ? 'Перемешивание включено' 
-                                            : 'Перемешивание выключено'),
-                                          duration: const Duration(seconds: 1),
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.shuffle,
+                                            color: playback.shuffleEnabled
+                                                ? Colors.green
+                                                : Colors.white,
+                                          ),
+                                          onPressed: () {
+                                            // Обновляем состояние провайдера вместо локального состояния
+                                            context
+                                                .read<PlaybackCubit>()
+                                                .toggleShuffle();
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  !playback.shuffleEnabled
+                                                      ? 'Перемешивание включено'
+                                                      : 'Перемешивание выключено',
+                                                ),
+                                                duration: const Duration(
+                                                  seconds: 1,
+                                                ),
+                                              ),
+                                            );
+                                          },
                                         ),
-                                      );
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.skip_previous, color: Colors.white, size: 36),
-                                    onPressed: () {
-                                      // Используем метод провайдера вместо сообщения
-                                      audioProvider.playPreviousTrack();
-                                    },
-                                  ),
-                                  _buildPlayButton(isLoading, isPlaying, audioProvider),
-                                  IconButton(
-                                    icon: const Icon(Icons.skip_next, color: Colors.white, size: 36),
-                                    onPressed: () {
-                                      // Используем метод провайдера вместо сообщения
-                                      audioProvider.playNextTrack();
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.repeat,
-                                      color: audioProvider.repeatEnabled ? Colors.green : Colors.white,
-                                    ),
-                                    onPressed: () {
-                                      // Обновляем состояние провайдера вместо локального состояния
-                                      audioProvider.toggleRepeatMode();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(audioProvider.repeatEnabled 
-                                            ? 'Повтор включен' 
-                                            : 'Повтор выключен'),
-                                          duration: const Duration(seconds: 1),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.skip_previous,
+                                            color: Colors.white,
+                                            size: 36,
+                                          ),
+                                          onPressed: () {
+                                            // Используем метод провайдера вместо сообщения
+                                            context
+                                                .read<PlaybackCubit>()
+                                                .playPrevious();
+                                          },
                                         ),
-                                      );
-                                    },
-                                  ),
+                                        _buildPlayButton(
+                                          context,
+                                          isLoading,
+                                          isPlaying,
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.skip_next,
+                                            color: Colors.white,
+                                            size: 36,
+                                          ),
+                                          onPressed: () {
+                                            // Используем метод провайдера вместо сообщения
+                                            context
+                                                .read<PlaybackCubit>()
+                                                .playNext();
+                                          },
+                                        ),
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.repeat,
+                                            color: playback.repeatEnabled
+                                                ? Colors.green
+                                                : Colors.white,
+                                          ),
+                                          onPressed: () {
+                                            // Обновляем состояние провайдера вместо локального состояния
+                                            context
+                                                .read<PlaybackCubit>()
+                                                .toggleRepeat();
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  !playback.repeatEnabled
+                                                      ? 'Повтор включен'
+                                                      : 'Повтор выключен',
+                                                ),
+                                                duration: const Duration(
+                                                  seconds: 1,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -833,14 +900,18 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     );
   }
 
-  Widget _buildPlayButton(bool isLoading, bool isPlaying, AudioPlayerAlternativeProvider audioProvider) {
+  Widget _buildPlayButton(
+    BuildContext context,
+    bool isLoading,
+    bool isPlaying,
+  ) {
     if (isLoading) {
       return Container(
         width: 70,
         height: 70,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.green.withOpacity(0.7),
+          color: Colors.green.withValues(alpha: 0.7),
         ),
         child: const CircularProgressIndicator(
           color: Colors.white,
@@ -848,7 +919,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         ),
       );
     }
-    
+
     return Container(
       width: 70,
       height: 70,
@@ -857,7 +928,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         color: Colors.green,
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withOpacity(0.3),
+            color: Colors.green.withValues(alpha: 0.3),
             spreadRadius: 1,
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -870,7 +941,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
           color: Colors.white,
           size: 40,
         ),
-        onPressed: () => audioProvider.togglePlayPause(),
+        onPressed: () => context.read<PlaybackCubit>().togglePlayPause(),
       ),
     );
   }

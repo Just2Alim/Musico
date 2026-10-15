@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
-import '../providers/MusicDataProvider.dart';
-import '../providers/AudioPlayerAlternativeProvider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../features/player/playback_cubit.dart';
+import '../providers/music_data_provider.dart';
 import '../widgets/mini_player.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -11,12 +14,18 @@ class SearchScreen extends StatefulWidget {
   _SearchScreenState createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderStateMixin {
+class _SearchScreenState extends State<SearchScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   TabController? _tabController;
   bool _isSearching = false;
   String _searchQuery = '';
-  
+  Timer? _debounce;
+  int _searchVersion = 0;
+  String _searchNotice = '';
+  bool _identityInitialized = false;
+  String? _observedUserId;
+
   Map<String, dynamic> _searchResults = {
     'tracks': [],
     'playlists': [],
@@ -28,55 +37,90 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _searchController.addListener(_onSearchChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final music = context.read<MusicDataProvider>();
+      if (music.isSignedIn) music.loadFavoriteTracks();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final userId = context.watch<MusicDataProvider>().currentUserId;
+    if (_identityInitialized && userId != _observedUserId) {
+      _debounce?.cancel();
+      _searchVersion++;
+      _searchController.removeListener(_onSearchChanged);
+      _searchController.clear();
+      _searchController.addListener(_onSearchChanged);
+      _searchQuery = '';
+      _searchNotice = '';
+      _isSearching = false;
+      _searchResults = {'tracks': [], 'playlists': [], 'artists': []};
+    }
+    _identityInitialized = true;
+    _observedUserId = userId;
   }
 
   @override
   void dispose() {
     _tabController?.dispose();
+    _debounce?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
 
   void _onSearchChanged() {
-    if (_searchController.text.length >= 2) {
-      setState(() {
-        _searchQuery = _searchController.text;
-      });
-      _performSearch(_searchQuery);
-    } else if (_searchController.text.isEmpty) {
-      setState(() {
-        _searchQuery = '';
-        _searchResults = {
-          'tracks': [],
-          'playlists': [],
-          'artists': [],
-        };
-      });
-    }
+    _debounce?.cancel();
+    final query = _searchController.text.trim();
+    final version = ++_searchVersion;
+    setState(() {
+      _searchQuery = query.length >= 2 ? query : '';
+      _isSearching = query.length >= 2;
+      _searchNotice = '';
+      _searchResults = {'tracks': [], 'playlists': [], 'artists': []};
+    });
+    if (query.length < 2) return;
+    _debounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _performSearch(query, version),
+    );
   }
 
-  Future<void> _performSearch(String query) async {
-    if (query.isEmpty) return;
-    
+  void _submitSearch(String value) {
+    _debounce?.cancel();
+    final query = value.trim();
+    if (query.length < 2) return;
+    final version = ++_searchVersion;
     setState(() {
+      _searchQuery = query;
       _isSearching = true;
+      _searchNotice = '';
     });
+    _performSearch(query, version);
+  }
 
-    final musicProvider = Provider.of<MusicDataProvider>(context, listen: false);
-    final results = await musicProvider.searchMusic(query);
-    
+  Future<void> _performSearch(String query, int version) async {
+    if (!mounted || version != _searchVersion) return;
+    final music = context.read<MusicDataProvider>();
+    final userId = music.currentUserId;
+    final results = await music.searchMusic(query);
+    if (!mounted || version != _searchVersion || userId != music.currentUserId)
+      return;
     setState(() {
       _searchResults = results;
+      _searchNotice = music.errorMessage;
       _isSearching = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final audioProvider = Provider.of<AudioPlayerAlternativeProvider>(context);
-    final currentTrack = audioProvider.currentTrack;
-    
+    final playback = context.watch<PlaybackCubit>().state;
+    final currentTrack = playback.currentTrack;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -115,11 +159,18 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
                       ),
                     ),
                     textInputAction: TextInputAction.search,
-                    onSubmitted: (value) {
-                      if (value.isNotEmpty) _performSearch(value);
-                    },
+                    onSubmitted: _submitSearch,
                   ),
                 ),
+
+                if (_searchNotice.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      _searchNotice,
+                      style: const TextStyle(color: Colors.amber),
+                    ),
+                  ),
 
                 // Tab bar
                 if (_searchQuery.isNotEmpty)
@@ -138,30 +189,32 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
                 // Search results or categories
                 Expanded(
                   child: _isSearching
-                      ? const Center(child: CircularProgressIndicator(color: Colors.green))
+                      ? const Center(
+                          child: CircularProgressIndicator(color: Colors.green),
+                        )
                       : _searchQuery.isEmpty
-                          ? _buildSearchCategories()
-                          : TabBarView(
-                              controller: _tabController,
-                              children: [
-                                // Tracks tab
-                                _buildTracksResults(),
-                                
-                                // Artists tab
-                                _buildArtistsResults(),
-                                
-                                // Playlists tab
-                                _buildPlaylistsResults(),
-                              ],
-                            ),
+                      ? _buildSearchCategories()
+                      : TabBarView(
+                          controller: _tabController,
+                          children: [
+                            // Tracks tab
+                            _buildTracksResults(),
+
+                            // Artists tab
+                            _buildArtistsResults(),
+
+                            // Playlists tab
+                            _buildPlaylistsResults(),
+                          ],
+                        ),
                 ),
-                
+
                 // Space for bottom navigation and mini-player
                 SizedBox(height: currentTrack != null ? 130 : 60),
               ],
             ),
           ),
-          
+
           // Mini Player
           if (currentTrack != null)
             Positioned(
@@ -172,49 +225,17 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
                 trackName: currentTrack.name,
                 artistName: currentTrack.artist,
                 coverImageUrl: currentTrack.coverImageUrl,
-                isPlaying: audioProvider.isPlaying,
-                isLoading: audioProvider.isLoading,
+                isPlaying: playback.isPlaying,
+                isLoading: playback.isLoading,
                 onTap: () {
-                  Navigator.pushNamed(
-                    context,
-                    '/player',
-                    arguments: {'trackId': currentTrack.id},
-                  );
+                  context.push('/player/${currentTrack.id}');
                 },
                 onPlayPause: () {
-                  audioProvider.togglePlayPause();
+                  context.read<PlaybackCubit>().togglePlayPause();
                 },
               ),
             ),
         ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.black,
-        selectedItemColor: Colors.green,
-        unselectedItemColor: Colors.grey,
-        currentIndex: 1, // Search tab
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
-          BottomNavigationBarItem(icon: Icon(Icons.library_music), label: 'Library'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Account'),
-        ],
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              Navigator.pushReplacementNamed(context, '/home');
-              break;
-            case 1:
-              // Already on search
-              break;
-            case 2:
-              Navigator.pushReplacementNamed(context, '/library');
-              break;
-            case 3:
-              Navigator.pushReplacementNamed(context, '/account');
-              break;
-          }
-        },
       ),
     );
   }
@@ -234,7 +255,7 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
       {'name': 'Folk', 'color': Colors.brown},
       {'name': 'Indie', 'color': Colors.indigo},
     ];
-    
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -261,8 +282,9 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
               itemBuilder: (context, index) {
                 return GestureDetector(
                   onTap: () {
-                    _searchController.text = categories[index]['name'] as String;
-                    _performSearch(_searchController.text);
+                    _searchController.text =
+                        categories[index]['name'] as String;
+                    _submitSearch(_searchController.text);
                   },
                   child: Container(
                     decoration: BoxDecoration(
@@ -292,31 +314,40 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
   // Tracks results
   Widget _buildTracksResults() {
     final tracks = _searchResults['tracks'] as List<dynamic>;
-    
+    final favoriteIds = context
+        .watch<MusicDataProvider>()
+        .favoriteTracks
+        .map((track) => track['id'])
+        .toSet();
+
     if (tracks.isEmpty) {
       return _buildEmptyResults('No tracks found');
     }
-    
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: tracks.length,
       itemBuilder: (context, index) {
         final track = tracks[index];
+        final isFavorite = favoriteIds.contains(track['id']);
         return ListTile(
           leading: Container(
             width: 50,
             height: 50,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(5),
-              image: track['coverImageUrl'] != null
+              image:
+                  (track['coverImageUrl'] ?? track['cover_image_url']) != null
                   ? DecorationImage(
-                      image: NetworkImage(track['coverImageUrl']),
+                      image: NetworkImage(
+                        track['coverImageUrl'] ?? track['cover_image_url'],
+                      ),
                       fit: BoxFit.cover,
                     )
                   : null,
               color: Colors.grey[800],
             ),
-            child: track['coverImageUrl'] == null
+            child: (track['coverImageUrl'] ?? track['cover_image_url']) == null
                 ? const Icon(Icons.music_note, color: Colors.white)
                 : null,
           ),
@@ -334,19 +365,29 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
           ),
           trailing: IconButton(
             icon: Icon(
-              track['isLiked'] ? Icons.favorite : Icons.favorite_border,
-              color: track['isLiked'] ? Colors.green : Colors.grey,
+              isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: isFavorite ? Colors.green : Colors.grey,
             ),
-            onPressed: () {
-              // Toggle favorite
+            onPressed: () async {
+              await context.read<MusicDataProvider>().toggleFavorite(
+                track['id'] as int,
+              );
+              if (!mounted) return;
+              final music = context.read<MusicDataProvider>();
+              if (music.errorMessage.isNotEmpty) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(music.errorMessage)));
+                return;
+              }
             },
           ),
           onTap: () {
-            Navigator.pushNamed(
-              context,
-              '/player',
-              arguments: {'trackId': track['id']},
+            context.read<PlaybackCubit>().playTracks(
+              List<Map<String, dynamic>>.from(_searchResults['tracks'] as List),
+              track['id'] as int,
             );
+            context.push('/player/${track['id']}');
           },
         );
       },
@@ -356,11 +397,11 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
   // Artists results
   Widget _buildArtistsResults() {
     final artists = _searchResults['artists'] as List<dynamic>;
-    
+
     if (artists.isEmpty) {
       return _buildEmptyResults('No artists found');
     }
-    
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: artists.length,
@@ -379,7 +420,9 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
             overflow: TextOverflow.ellipsis,
           ),
           onTap: () {
-            // Navigate to artist page
+            _searchController.text = artist as String;
+            _tabController?.animateTo(0);
+            _submitSearch(artist);
           },
         );
       },
@@ -389,11 +432,11 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
   // Playlists results
   Widget _buildPlaylistsResults() {
     final playlists = _searchResults['playlists'] as List<dynamic>;
-    
+
     if (playlists.isEmpty) {
       return _buildEmptyResults('No playlists found');
     }
-    
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: playlists.length,
@@ -405,15 +448,17 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
             height: 50,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(5),
-              image: playlist['imageUrl'] != null
+              image: (playlist['imageUrl'] ?? playlist['image_url']) != null
                   ? DecorationImage(
-                      image: NetworkImage(playlist['imageUrl']),
+                      image: NetworkImage(
+                        playlist['imageUrl'] ?? playlist['image_url'],
+                      ),
                       fit: BoxFit.cover,
                     )
                   : null,
               color: Colors.grey[800],
             ),
-            child: playlist['imageUrl'] == null
+            child: (playlist['imageUrl'] ?? playlist['image_url']) == null
                 ? const Icon(Icons.playlist_play, color: Colors.white)
                 : null,
           ),
@@ -424,17 +469,13 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
-            '${playlist['trackCount'] ?? 0} tracks',
+            '${playlist['trackCount'] ?? playlist['track_count'] ?? 0} tracks',
             style: TextStyle(color: Colors.grey[600]),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           onTap: () {
-            Navigator.pushNamed(
-              context,
-              '/playlist',
-              arguments: {'playlistId': playlist['id']},
-            );
+            context.push('/playlist/${playlist['id']}');
           },
         );
       },

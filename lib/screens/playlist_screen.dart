@@ -10,9 +10,7 @@ class PlaylistScreen extends StatelessWidget {
     final playlistId = arguments['playlistId'];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Playlist $playlistId'),
-      ),
+      appBar: AppBar(title: Text('Playlist $playlistId')),
       body: Center(
         child: Text('Displaying details for Playlist ID: $playlistId'),
       ),

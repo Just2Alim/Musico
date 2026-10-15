@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../themes/app_theme.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
 import 'package:provider/provider.dart';
@@ -122,7 +123,7 @@ class _SearchScreenState extends State<SearchScreen>
     final currentTrack = playback.currentTrack;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.canvas,
       body: Stack(
         children: [
           SafeArea(
@@ -134,28 +135,37 @@ class _SearchScreenState extends State<SearchScreen>
                   child: TextField(
                     controller: _searchController,
                     style: const TextStyle(color: Colors.white),
-                    cursorColor: Colors.green,
+                    cursorColor: AppTheme.accent,
                     decoration: InputDecoration(
-                      hintText: 'Search for tracks, artists, playlists...',
-                      hintStyle: TextStyle(color: Colors.grey[600]),
-                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      hintText: 'Поиск треков, исполнителей и плейлистов',
+                      hintStyle: TextStyle(color: AppTheme.mutedText),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: AppTheme.mutedText,
+                      ),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear, color: Colors.grey),
+                              icon: const Icon(
+                                Icons.clear,
+                                color: AppTheme.mutedText,
+                              ),
                               onPressed: () {
                                 _searchController.clear();
                               },
                             )
                           : null,
                       filled: true,
-                      fillColor: Colors.grey[900],
+                      fillColor: AppTheme.surface,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide.none,
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: Colors.green, width: 1.0),
+                        borderSide: BorderSide(
+                          color: AppTheme.accent,
+                          width: 1.0,
+                        ),
                       ),
                     ),
                     textInputAction: TextInputAction.search,
@@ -176,21 +186,23 @@ class _SearchScreenState extends State<SearchScreen>
                 if (_searchQuery.isNotEmpty)
                   TabBar(
                     controller: _tabController,
-                    indicatorColor: Colors.green,
+                    indicatorColor: AppTheme.accent,
                     tabs: const [
-                      Tab(text: 'Tracks'),
-                      Tab(text: 'Artists'),
-                      Tab(text: 'Playlists'),
+                      Tab(text: 'Треки'),
+                      Tab(text: 'Исполнители'),
+                      Tab(text: 'Плейлисты'),
                     ],
                     labelColor: Colors.white,
-                    unselectedLabelColor: Colors.grey,
+                    unselectedLabelColor: AppTheme.mutedText,
                   ),
 
                 // Search results or categories
                 Expanded(
                   child: _isSearching
                       ? const Center(
-                          child: CircularProgressIndicator(color: Colors.green),
+                          child: CircularProgressIndicator(
+                            color: AppTheme.accent,
+                          ),
                         )
                       : _searchQuery.isEmpty
                       ? _buildSearchCategories()
@@ -251,7 +263,7 @@ class _SearchScreenState extends State<SearchScreen>
       {'name': 'R&B', 'color': Colors.red},
       {'name': 'Classical', 'color': Colors.teal},
       {'name': 'Jazz', 'color': Colors.amber},
-      {'name': 'Metal', 'color': Colors.grey},
+      {'name': 'Metal', 'color': AppTheme.mutedText},
       {'name': 'Folk', 'color': Colors.brown},
       {'name': 'Indie', 'color': Colors.indigo},
     ];
@@ -262,7 +274,7 @@ class _SearchScreenState extends State<SearchScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Browse Categories',
+            'Обзор категорий',
             style: TextStyle(
               color: Colors.white,
               fontSize: 22,
@@ -321,7 +333,7 @@ class _SearchScreenState extends State<SearchScreen>
         .toSet();
 
     if (tracks.isEmpty) {
-      return _buildEmptyResults('No tracks found');
+      return _buildEmptyResults('Треки не найдены');
     }
 
     return ListView.builder(
@@ -345,7 +357,7 @@ class _SearchScreenState extends State<SearchScreen>
                       fit: BoxFit.cover,
                     )
                   : null,
-              color: Colors.grey[800],
+              color: AppTheme.elevatedSurface,
             ),
             child: (track['coverImageUrl'] ?? track['cover_image_url']) == null
                 ? const Icon(Icons.music_note, color: Colors.white)
@@ -359,29 +371,39 @@ class _SearchScreenState extends State<SearchScreen>
           ),
           subtitle: Text(
             track['artist'] ?? 'Unknown Artist',
-            style: TextStyle(color: Colors.grey[600]),
+            style: TextStyle(color: AppTheme.mutedText),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: IconButton(
-            icon: Icon(
-              isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: isFavorite ? Colors.green : Colors.grey,
-            ),
-            onPressed: () async {
-              await context.read<MusicDataProvider>().toggleFavorite(
-                track['id'] as int,
-              );
-              if (!mounted) return;
-              final music = context.read<MusicDataProvider>();
-              if (music.errorMessage.isNotEmpty) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(music.errorMessage)));
-                return;
-              }
-            },
-          ),
+          trailing: track['source'] == 'jamendo'
+              ? const Text(
+                  'JAMENDO',
+                  style: TextStyle(
+                    color: AppTheme.accent,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
+                )
+              : IconButton(
+                  tooltip: isFavorite ? 'Убрать из избранного' : 'В избранное',
+                  icon: Icon(
+                    isFavorite ? Icons.favorite : Icons.favorite_border,
+                    color: isFavorite ? AppTheme.accent : AppTheme.mutedText,
+                  ),
+                  onPressed: () async {
+                    await context.read<MusicDataProvider>().toggleFavorite(
+                      track['id'] as int,
+                    );
+                    if (!mounted) return;
+                    final music = context.read<MusicDataProvider>();
+                    if (music.errorMessage.isNotEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(music.errorMessage)),
+                      );
+                    }
+                  },
+                ),
           onTap: () {
             context.read<PlaybackCubit>().playTracks(
               List<Map<String, dynamic>>.from(_searchResults['tracks'] as List),
@@ -399,7 +421,7 @@ class _SearchScreenState extends State<SearchScreen>
     final artists = _searchResults['artists'] as List<dynamic>;
 
     if (artists.isEmpty) {
-      return _buildEmptyResults('No artists found');
+      return _buildEmptyResults('Исполнители не найдены');
     }
 
     return ListView.builder(
@@ -410,7 +432,7 @@ class _SearchScreenState extends State<SearchScreen>
         return ListTile(
           leading: CircleAvatar(
             radius: 25,
-            backgroundColor: Colors.grey[800],
+            backgroundColor: AppTheme.elevatedSurface,
             child: const Icon(Icons.person, color: Colors.white),
           ),
           title: Text(
@@ -434,7 +456,7 @@ class _SearchScreenState extends State<SearchScreen>
     final playlists = _searchResults['playlists'] as List<dynamic>;
 
     if (playlists.isEmpty) {
-      return _buildEmptyResults('No playlists found');
+      return _buildEmptyResults('Плейлисты не найдены');
     }
 
     return ListView.builder(
@@ -456,7 +478,7 @@ class _SearchScreenState extends State<SearchScreen>
                       fit: BoxFit.cover,
                     )
                   : null,
-              color: Colors.grey[800],
+              color: AppTheme.elevatedSurface,
             ),
             child: (playlist['imageUrl'] ?? playlist['image_url']) == null
                 ? const Icon(Icons.playlist_play, color: Colors.white)
@@ -470,7 +492,7 @@ class _SearchScreenState extends State<SearchScreen>
           ),
           subtitle: Text(
             '${playlist['trackCount'] ?? playlist['track_count'] ?? 0} tracks',
-            style: TextStyle(color: Colors.grey[600]),
+            style: TextStyle(color: AppTheme.mutedText),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -488,11 +510,11 @@ class _SearchScreenState extends State<SearchScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off, color: Colors.grey[700], size: 70),
+          Icon(Icons.search_off, color: AppTheme.elevatedSurface, size: 70),
           const SizedBox(height: 16),
           Text(
             message,
-            style: TextStyle(color: Colors.grey[600], fontSize: 16),
+            style: TextStyle(color: AppTheme.mutedText, fontSize: 16),
           ),
         ],
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../themes/app_theme.dart';
 
 class CategoryHeader extends StatelessWidget {
   final String title;
@@ -24,9 +25,9 @@ class CategoryHeader extends StatelessWidget {
           TextButton(
             onPressed: onSeeAllPressed,
             child: const Text(
-              'See All',
+              'Смотреть всё',
               style: TextStyle(
-                color: Colors.green,
+                color: AppTheme.accent,
                 fontWeight: FontWeight.w500,
               ),
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../themes/app_theme.dart';
 import '../core/responsive_breakpoints.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -56,11 +57,11 @@ class _HomeScreenState extends State<HomeScreen> {
   String _getGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) {
-      return 'Good Morning';
+      return 'Доброе утро';
     } else if (hour < 17) {
-      return 'Good Afternoon';
+      return 'Добрый день';
     } else {
-      return 'Good Evening';
+      return 'Добрый вечер';
     }
   }
 
@@ -72,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final screenSize = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.canvas,
       body: Stack(
         children: [
           // Gradient background
@@ -84,9 +85,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color(0xFF1DB954).withValues(alpha: 0.8), // Green tint
-                  Colors.black.withValues(alpha: 0.95),
-                  Colors.black,
+                  AppTheme.accent.withValues(alpha: 0.3),
+                  AppTheme.canvas.withValues(alpha: 0.95),
+                  AppTheme.canvas,
                 ],
                 stops: [0.0, 0.2, 0.5],
               ),
@@ -106,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   // App Bar
                   SliverAppBar(
                     backgroundColor: _showAppBarBackground
-                        ? Colors.black.withValues(alpha: 0.9)
+                        ? AppTheme.canvas.withValues(alpha: 0.9)
                         : Colors.transparent,
                     floating: true,
                     pinned: true,
@@ -176,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         // Recently Played Tracks
                         const SizedBox(height: 32),
                         CategoryHeader(
-                          title: 'Recently Played',
+                          title: 'Недавно прослушано',
                           onSeeAllPressed: () {
                             context.push('/library');
                           },
@@ -187,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         // Made For You
                         const SizedBox(height: 32),
                         CategoryHeader(
-                          title: 'Made For You',
+                          title: 'Для вас',
                           onSeeAllPressed: () {
                             // Navigate to made for you screen
                           },
@@ -196,14 +197,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         _buildMadeForYou(context),
 
                         const SizedBox(height: 32),
-                        const CategoryHeader(title: 'Discover tracks'),
+                        const CategoryHeader(title: 'Каталог музыки'),
                         const SizedBox(height: 16),
                         _buildTrackCatalog(context),
 
                         // Popular Artists
                         const SizedBox(height: 32),
                         CategoryHeader(
-                          title: 'Popular Artists',
+                          title: 'Популярные исполнители',
                           onSeeAllPressed: () {
                             // Navigate to artists screen
                           },
@@ -249,23 +250,19 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildRecentGrid(BuildContext context) {
     // Curated entry points into the user's real library and catalog.
     final items = [
+      {'name': 'Избранное', 'color': Colors.pink[800], 'icon': Icons.favorite},
       {
-        'name': 'Liked Songs',
-        'color': Colors.pink[800],
-        'icon': Icons.favorite,
-      },
-      {
-        'name': 'Recently Played',
+        'name': 'Недавно прослушано',
         'color': Colors.indigo[600],
         'icon': Icons.history,
       },
       {
-        'name': 'Top Tracks',
+        'name': 'Популярные треки',
         'color': Colors.orange[800],
         'icon': Icons.trending_up,
       },
       {
-        'name': 'New Releases',
+        'name': 'Новые релизы',
         'color': Colors.blue[600],
         'icon': Icons.new_releases,
       },
@@ -333,15 +330,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (musicProvider.isLoading) {
       return const Center(
-        child: CircularProgressIndicator(color: Colors.green),
+        child: CircularProgressIndicator(color: AppTheme.accent),
       );
     }
 
     if (recentlyPlayed.isEmpty) {
       return const Center(
         child: Text(
-          'No recently played tracks',
-          style: TextStyle(color: Colors.grey),
+          'Пока нет прослушанных треков',
+          style: TextStyle(color: AppTheme.mutedText),
         ),
       );
     }
@@ -373,15 +370,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (musicProvider.isLoading) {
       return const Center(
-        child: CircularProgressIndicator(color: Colors.green),
+        child: CircularProgressIndicator(color: AppTheme.accent),
       );
     }
 
     if (playlists.isEmpty) {
       return const Center(
         child: Text(
-          'No featured playlists',
-          style: TextStyle(color: Colors.grey),
+          'Подборки пока не добавлены',
+          style: TextStyle(color: AppTheme.mutedText),
         ),
       );
     }
@@ -396,7 +393,7 @@ class _HomeScreenState extends State<HomeScreen> {
           return AlbumCard(
             id: playlist.id,
             title: playlist.name,
-            subtitle: playlist.subtitle ?? 'Featured Playlist',
+            subtitle: playlist.subtitle ?? 'Подборка Musico',
             imageUrl: playlist.imageUrl,
             onTap: () {
               context.push('/playlist/${playlist.id}');
@@ -414,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
         provider.errorMessage.isNotEmpty
             ? provider.errorMessage
             : 'Каталог пока пуст.',
-        style: const TextStyle(color: Colors.grey),
+        style: const TextStyle(color: AppTheme.mutedText),
       );
     }
     return SizedBox(
@@ -461,7 +458,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (artists.isEmpty) {
       return const Text(
         'Добавьте треки в каталог, чтобы увидеть исполнителей.',
-        style: TextStyle(color: Colors.grey),
+        style: TextStyle(color: AppTheme.mutedText),
       );
     }
     return SizedBox(
@@ -476,8 +473,12 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 CircleAvatar(
                   radius: 60,
-                  backgroundColor: Colors.grey[800],
-                  child: Icon(Icons.person, size: 50, color: Colors.grey[300]),
+                  backgroundColor: AppTheme.elevatedSurface,
+                  child: Icon(
+                    Icons.person,
+                    size: 50,
+                    color: AppTheme.mutedText,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(

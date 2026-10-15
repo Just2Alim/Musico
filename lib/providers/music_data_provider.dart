@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:json_annotation/json_annotation.dart';
 import '../data/local_music_cache.dart';
+import '../data/jamendo_catalog_service.dart';
 import '../data/music_repository.dart';
 
 part 'music_data_provider.g.dart';
@@ -57,6 +58,7 @@ class MusicDataProvider extends ChangeNotifier {
     this.repository,
     this.cache, {
     required this.backendEnabled,
+    this.jamendoCatalog,
   }) {
     _observedUserId = _userId;
     if (backendEnabled) {
@@ -72,6 +74,7 @@ class MusicDataProvider extends ChangeNotifier {
   final MusicRepository repository;
   final LocalMusicCache cache;
   final bool backendEnabled;
+  final JamendoCatalogService? jamendoCatalog;
   StreamSubscription<AuthState>? _authSubscription;
   String? _observedUserId;
   int _identityVersion = 0;
@@ -308,8 +311,20 @@ class MusicDataProvider extends ChangeNotifier {
       if (!_isCurrentIdentity(version, userId)) {
         return _searchResult(foundTracks, []);
       }
+      var externalTracks = <Map<String, dynamic>>[];
+      final catalog = jamendoCatalog;
+      if (catalog?.isConfigured == true) {
+        try {
+          externalTracks = await catalog!.search(query.trim());
+        } catch (_) {
+          _errorMessage = 'Дополнительный лицензированный каталог недоступен.';
+        }
+      }
+      if (!_isCurrentIdentity(version, userId)) {
+        return _searchResult(foundTracks, []);
+      }
       return _searchResult(
-        foundTracks,
+        [...foundTracks, ...externalTracks],
         foundPlaylists
             .where(
               (playlist) => (playlist['name'] as String? ?? '')
@@ -400,6 +415,7 @@ class MusicDataProvider extends ChangeNotifier {
   Future<void> loadAllData() async {
     _isLoading = true;
     _hasMoreTracks = true;
+    var catalogWarning = '';
     if (!backendEnabled) {
       _tracks = cache.readTracks();
       _errorMessage = _tracks.isEmpty
@@ -411,8 +427,18 @@ class MusicDataProvider extends ChangeNotifier {
     }
     notifyListeners();
     try {
-      _tracks = await repository.tracks();
-      _hasMoreTracks = _tracks.length == 30;
+      final catalogTracks = await repository.tracks();
+      _hasMoreTracks = catalogTracks.length == 30;
+      var externalTracks = <Map<String, dynamic>>[];
+      final catalog = jamendoCatalog;
+      if (catalog?.isConfigured == true) {
+        try {
+          externalTracks = await catalog!.featured();
+        } catch (_) {
+          catalogWarning = 'Лицензированный каталог временно недоступен.';
+        }
+      }
+      _tracks = [...catalogTracks, ...externalTracks];
       await cache.saveTracks(_tracks);
       await loadFeaturedPlaylists();
       await Future.wait([
@@ -420,7 +446,7 @@ class MusicDataProvider extends ChangeNotifier {
         loadRecentlyPlayed(),
         loadFavoriteTracks(),
       ]);
-      _errorMessage = '';
+      _errorMessage = catalogWarning;
     } catch (error) {
       _tracks = cache.readTracks();
       _errorMessage = _tracks.isEmpty

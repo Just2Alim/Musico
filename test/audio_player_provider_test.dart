@@ -22,6 +22,7 @@ class _FakeRepository extends MusicRepository {
   Object? historyError;
   List<Map<String, dynamic>>? playlistRows;
   final listening = <({int id, bool completed})>[];
+  final favoriteWrites = <int>[];
   final pendingTracks = <int, Completer<Map<String, dynamic>?>>{};
   final pendingFavorites = <int, Completer<bool>>{};
 
@@ -35,6 +36,7 @@ class _FakeRepository extends MusicRepository {
 
   @override
   Future<void> setFavorite(int trackId, bool favorite) async {
+    favoriteWrites.add(trackId);
     await favoriteUpdate?.future;
   }
 
@@ -109,6 +111,30 @@ void main() {
     expect(provider.isPlaying, isTrue);
     verify(() => audio.play(any<Source>())).called(1);
   });
+
+  test(
+    'external licensed tracks never write Supabase favorites or history',
+    () async {
+      await provider.loadAndPlayTracks([
+        {
+          'id': -123,
+          'name': 'Open Sky',
+          'artist': 'Example Artist',
+          'audio_file_url': 'https://cdn.example.test/open-sky.mp3',
+          'duration': 210,
+          'source': 'jamendo',
+          'license_url': 'https://creativecommons.org/licenses/by/4.0/',
+        },
+      ], -123);
+      await Future<void>.delayed(Duration.zero);
+      await provider.toggleFavorite();
+
+      expect(provider.currentTrack?.source, 'jamendo');
+      expect(repository.listening, isEmpty);
+      expect(repository.favoriteWrites, isEmpty);
+      expect(provider.errorMessage, contains('каталог'));
+    },
+  );
 
   test(
     'catalog queue hydrates the saved favorite without restarting audio',

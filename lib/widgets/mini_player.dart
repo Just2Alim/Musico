@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../themes/app_theme.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class MiniPlayer extends StatelessWidget {
@@ -35,11 +36,11 @@ class MiniPlayer extends StatelessWidget {
         height: 65,
         margin: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.grey[900],
+          color: AppTheme.surface,
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
+              color: AppTheme.canvas.withValues(alpha: 0.5),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -54,7 +55,7 @@ class MiniPlayer extends StatelessWidget {
               margin: const EdgeInsets.only(left: 8),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(5),
-                color: Colors.grey[800],
+                color: AppTheme.elevatedSurface,
               ),
               child: coverImageUrl == null
                   ? const Icon(Icons.music_note, color: Colors.white)
@@ -89,7 +90,7 @@ class MiniPlayer extends StatelessWidget {
                     ),
                     Text(
                       artistName,
-                      style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                      style: TextStyle(color: AppTheme.mutedText, fontSize: 12),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -103,7 +104,7 @@ class MiniPlayer extends StatelessWidget {
               IconButton(
                 icon: Icon(
                   isLiked ? Icons.favorite : Icons.favorite_border,
-                  color: isLiked ? Colors.green : Colors.white,
+                  color: isLiked ? AppTheme.accent : Colors.white,
                   size: 20,
                 ),
                 onPressed: onLike,

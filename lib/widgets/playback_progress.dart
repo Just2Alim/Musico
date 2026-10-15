@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../themes/app_theme.dart';
 
 /// Keeps late platform progress events within the current track's bounds.
 class PlaybackProgress extends StatelessWidget {
@@ -26,8 +27,8 @@ class PlaybackProgress extends StatelessWidget {
       onChanged: length > 0
           ? (value) => onSeek(Duration(milliseconds: value.round()))
           : null,
-      activeColor: Colors.green,
-      inactiveColor: Colors.grey[800],
+      activeColor: AppTheme.accent,
+      inactiveColor: AppTheme.elevatedSurface,
     );
   }
 }

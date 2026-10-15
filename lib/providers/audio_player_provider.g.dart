@@ -15,6 +15,9 @@ Track _$TrackFromJson(Map<String, dynamic> json) => Track(
   audioFileUrl: _readTrackAudio(json, 'audio_file_url') as String? ?? '',
   duration: json['duration'] == null ? 0 : _trackInt(json['duration']),
   isLiked: json['isLiked'] as bool? ?? false,
+  source: json['source'] as String? ?? 'supabase',
+  licenseUrl: json['license_url'] as String?,
+  sourceUrl: json['source_url'] as String?,
 );
 
 Map<String, dynamic> _$TrackToJson(Track instance) => <String, dynamic>{
@@ -26,4 +29,7 @@ Map<String, dynamic> _$TrackToJson(Track instance) => <String, dynamic>{
   'audio_file_url': instance.audioFileUrl,
   'duration': instance.duration,
   'isLiked': instance.isLiked,
+  'source': instance.source,
+  'license_url': instance.licenseUrl,
+  'source_url': instance.sourceUrl,
 };

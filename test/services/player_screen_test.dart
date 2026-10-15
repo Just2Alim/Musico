@@ -254,7 +254,6 @@ void main() {
       await tester.pump();
       expect(playback.seekPosition, isNotNull);
       expect(playback.commands, [
-        'load:2',
         'play-pause',
         'play-pause',
         'previous',

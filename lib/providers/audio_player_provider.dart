@@ -30,6 +30,12 @@ class Track {
   final int duration;
   @JsonKey(defaultValue: false)
   final bool isLiked;
+  @JsonKey(defaultValue: 'supabase')
+  final String source;
+  @JsonKey(name: 'license_url')
+  final String? licenseUrl;
+  @JsonKey(name: 'source_url')
+  final String? sourceUrl;
 
   const Track({
     required this.id,
@@ -40,6 +46,9 @@ class Track {
     required this.audioFileUrl,
     required this.duration,
     this.isLiked = false,
+    this.source = 'supabase',
+    this.licenseUrl,
+    this.sourceUrl,
   });
 
   factory Track.fromJson(Map<String, dynamic> json) => _$TrackFromJson(json);
@@ -362,7 +371,7 @@ class AudioPlayerAlternativeProvider
       _isPlaying = true;
       _isLoading = false;
       notifyListeners();
-      if (refreshFavorite) {
+      if (refreshFavorite && track.source == 'supabase') {
         await _hydrateFavorite(track.id, request, favoriteRequest);
       }
     } catch (e) {
@@ -438,7 +447,7 @@ class AudioPlayerAlternativeProvider
   }
 
   void recordListening({bool completed = false}) async {
-    if (_currentTrack == null) return;
+    if (_currentTrack == null || _currentTrack!.source != 'supabase') return;
 
     try {
       print(
@@ -457,6 +466,12 @@ class AudioPlayerAlternativeProvider
   Future<void> toggleFavorite() async {
     final track = _currentTrack;
     if (track == null) return;
+    if (track.source != 'supabase') {
+      _errorMessage =
+          'Этот трек можно слушать, но сохранить в библиотеку можно только треки каталога Musico.';
+      notifyListeners();
+      return;
+    }
     final request = ++_favoriteRequest;
     final updated = Track.fromJson({
       ...track.toJson(),

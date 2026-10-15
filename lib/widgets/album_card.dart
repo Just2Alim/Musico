@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../themes/app_theme.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class AlbumCard extends StatelessWidget {
@@ -49,7 +50,7 @@ class AlbumCard extends StatelessWidget {
                 if (subtitle != null)
                   Text(
                     subtitle!,
-                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                    style: TextStyle(color: AppTheme.mutedText, fontSize: 12),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -65,17 +66,17 @@ class AlbumCard extends StatelessWidget {
     width: 160,
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(8),
-      color: Colors.grey[800],
+      color: AppTheme.elevatedSurface,
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.3),
+          color: AppTheme.canvas.withValues(alpha: 0.3),
           offset: const Offset(0, 3),
           blurRadius: 8,
         ),
       ],
     ),
     child: imageUrl == null
-        ? Center(child: Icon(Icons.album, size: 60, color: Colors.grey[600]))
+        ? Center(child: Icon(Icons.album, size: 60, color: AppTheme.mutedText))
         : ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: CachedNetworkImage(

@@ -19,6 +19,25 @@ void main() {
     expect(json['cover_image_url'], 'https://example.test/cover.jpg');
     expect(json['audio_file_url'], 'https://example.test/audio.mp3');
     expect(Track.fromJson(json).name, 'Midnight');
+    expect(Track.fromJson(json).source, 'supabase');
+  });
+
+  test('Track JSON round-trips licensed external source metadata', () {
+    final track = Track.fromJson({
+      'id': -123,
+      'name': 'Open Sky',
+      'artist': 'Example Artist',
+      'audio_file_url': 'https://cdn.example.test/open-sky.mp3',
+      'duration': 210,
+      'source': 'jamendo',
+      'license_url': 'https://creativecommons.org/licenses/by/4.0/',
+      'source_url': 'https://www.jamendo.com/track/123',
+    });
+
+    expect(track.source, 'jamendo');
+    expect(track.licenseUrl, 'https://creativecommons.org/licenses/by/4.0/');
+    expect(track.sourceUrl, 'https://www.jamendo.com/track/123');
+    expect(Track.fromJson(track.toJson()).sourceUrl, track.sourceUrl);
   });
 
   test('Venue JSON serialization round-trips coordinates', () {

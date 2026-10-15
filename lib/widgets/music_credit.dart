@@ -24,6 +24,9 @@ class MusicCredit extends StatelessWidget {
   };
 
   static bool supports(Track track) {
+    if (track.source == 'jamendo') {
+      return _secureUrl(track.sourceUrl) && _secureUrl(track.licenseUrl);
+    }
     final recording = _recordings[track.name];
     return track.artist == 'Kevin MacLeod' &&
         recording != null &&
@@ -34,6 +37,25 @@ class MusicCredit extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!supports(track)) return const SizedBox.shrink();
+    if (track.source == 'jamendo') {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${track.name} — ${track.artist} (Jamendo)'),
+          const SizedBox(height: 12),
+          Text('Авторство: ${track.artist}'),
+          const SizedBox(height: 8),
+          const Text('Лицензия и условия использования получены из каталога.'),
+          const SizedBox(height: 8),
+          const Text('Источник:'),
+          SelectableText(track.sourceUrl!),
+          const SizedBox(height: 8),
+          const Text('Лицензия:'),
+          SelectableText(track.licenseUrl!),
+        ],
+      );
+    }
     final recording = _recordings[track.name]!;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -53,5 +75,10 @@ class MusicCredit extends StatelessWidget {
         const SelectableText('https://creativecommons.org/licenses/by/4.0/'),
       ],
     );
+  }
+
+  static bool _secureUrl(String? value) {
+    final uri = value == null ? null : Uri.tryParse(value);
+    return uri != null && uri.scheme == 'https' && uri.host.isNotEmpty;
   }
 }

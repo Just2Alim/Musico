@@ -1,17 +1,22 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../data/supabase_config.dart';
+import '../themes/app_theme.dart';
+import '../widgets/auth_brand.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _isLoading = false;
 
   Future<void> _loginUser() async {
@@ -19,16 +24,14 @@ class _LoginScreenState extends State<LoginScreen> {
       _showError('Настройте Supabase в .env.local и перезапустите приложение.');
       return;
     }
-    final String email = _emailController.text.trim();
-    final String password = _passwordController.text.trim();
-
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
     if (email.isEmpty || password.isEmpty) {
-      _showError('Please fill in all fields');
+      _showError('Введите электронную почту и пароль.');
       return;
     }
 
     setState(() => _isLoading = true);
-
     try {
       await Supabase.instance.client.auth.signInWithPassword(
         email: email,
@@ -39,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _showError(error.message);
     } catch (_) {
       _showError(
-        'Сервис входа недоступен. Проверьте настройки Supabase и интернет.',
+        'Не удалось войти. Проверьте подключение и повторите попытку.',
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -51,6 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _showError('Сначала настройте Supabase и Google OAuth provider.');
       return;
     }
+    setState(() => _isLoading = true);
     try {
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
@@ -59,24 +63,32 @@ class _LoginScreenState extends State<LoginScreen> {
             : SupabaseConfig.authRedirectUrl,
       );
     } on AuthException catch (error) {
-      _showError(error.message);
+      final message = error.message.toLowerCase();
+      _showError(
+        message.contains('provider') || message.contains('google')
+            ? 'Google-вход пока не включён в Supabase. Настройте Google OAuth в Google Cloud и Supabase → Authentication → Providers.'
+            : error.message,
+      );
     } catch (_) {
       _showError(
-        'Не удалось открыть Google вход. Проверьте OAuth redirect URL.',
+        'Не удалось открыть Google-вход. Проверьте OAuth callback и интернет.',
       );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _showError(String message) {
-    showDialog(
+    if (!mounted) return;
+    showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Error'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Не удалось войти'),
         content: Text(message),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Понятно'),
           ),
         ],
       ),
@@ -91,93 +103,105 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'Welcome Back',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 30),
-            TextField(
-              controller: _emailController,
-              decoration: InputDecoration(
-                labelText: 'Email',
-                labelStyle: const TextStyle(color: Colors.grey),
-                filled: true,
-                fillColor: Colors.grey[900],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              keyboardType: TextInputType.emailAddress,
-              style: const TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 15),
-            TextField(
-              controller: _passwordController,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                labelStyle: const TextStyle(color: Colors.grey),
-                filled: true,
-                fillColor: Colors.grey[900],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              obscureText: true,
-              style: const TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 30),
-            _isLoading
-                ? const CircularProgressIndicator(color: Colors.green)
-                : ElevatedButton(
-                    onPressed: _loginUser,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 15,
-                        horizontal: 100,
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppTheme.canvas,
+    body: SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const AuthBrand(),
+                      const SizedBox(height: 36),
+                      Text(
+                        'С возвращением',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineSmall,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Войдите, чтобы продолжить слушать свою музыку.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
-                    ),
-                    child: const Text(
-                      'Log In',
-                      style: TextStyle(color: Colors.white),
-                    ),
+                      const SizedBox(height: 28),
+                      TextField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.username],
+                        decoration: const InputDecoration(
+                          labelText: 'Электронная почта',
+                          prefixIcon: Icon(Icons.mail_outline),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: true,
+                        textInputAction: TextInputAction.done,
+                        autofillHints: const [AutofillHints.password],
+                        onSubmitted: (_) => _loginUser(),
+                        decoration: const InputDecoration(
+                          labelText: 'Пароль',
+                          prefixIcon: Icon(Icons.lock_outline),
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      SizedBox(
+                        height: 52,
+                        child: FilledButton(
+                          onPressed: _isLoading ? null : _loginUser,
+                          child: _isLoading
+                              ? const SizedBox.square(
+                                  dimension: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Войти'),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        height: 50,
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoading ? null : _loginWithGoogle,
+                          icon: const Icon(Icons.account_circle_outlined),
+                          label: const Text('Продолжить с Google'),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            'Впервые в Musico? ',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          TextButton(
+                            onPressed: () => context.push('/register'),
+                            child: const Text('Создать аккаунт'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-            const SizedBox(height: 15),
-            OutlinedButton.icon(
-              onPressed: _loginWithGoogle,
-              icon: const Icon(Icons.login),
-              label: const Text('Continue with Google'),
-            ),
-            const SizedBox(height: 15),
-            TextButton(
-              onPressed: () {
-                context.push('/register');
-              },
-              child: const Text(
-                "Don't have an account? Sign up",
-                style: TextStyle(color: Colors.green),
+                ),
               ),
             ),
-          ],
+          ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }

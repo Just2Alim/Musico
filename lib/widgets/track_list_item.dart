@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../themes/app_theme.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class TrackListItem extends StatelessWidget {
@@ -33,10 +34,10 @@ class TrackListItem extends StatelessWidget {
               width: 120,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                color: Colors.grey[800],
+                color: AppTheme.elevatedSurface,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
+                    color: AppTheme.canvas.withValues(alpha: 0.3),
                     offset: const Offset(0, 3),
                     blurRadius: 8,
                   ),
@@ -47,7 +48,7 @@ class TrackListItem extends StatelessWidget {
                       child: Icon(
                         Icons.music_note,
                         size: 40,
-                        color: Colors.grey[600],
+                        color: AppTheme.mutedText,
                       ),
                     )
                   : ClipRRect(
@@ -75,7 +76,7 @@ class TrackListItem extends StatelessWidget {
             ),
             Text(
               artist,
-              style: TextStyle(color: Colors.grey[400], fontSize: 12),
+              style: TextStyle(color: AppTheme.mutedText, fontSize: 12),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

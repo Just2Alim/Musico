@@ -31,6 +31,7 @@ import 'screens/account_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
+import 'themes/app_theme.dart';
 import 'services/detailed_playlist_screen.dart';
 import 'services/library_screen.dart';
 import 'services/player_screen.dart';
@@ -92,6 +93,7 @@ Future<void> main() async {
     client: client,
     supabaseUrl: SupabaseConfig.url,
     publishableKey: SupabaseConfig.anonKey,
+    jamendoClientId: const String.fromEnvironment('JAMENDO_CLIENT_ID'),
     backendEnabled: SupabaseConfig.isConfigured,
   );
   runApp(
@@ -247,20 +249,7 @@ class MusicoApp extends StatelessWidget {
     },
   );
 
-  ThemeData _theme(Brightness brightness) => ThemeData(
-    useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: const Color(0xFF1DB954),
-      brightness: brightness,
-      surface: brightness == Brightness.dark
-          ? const Color(0xFF121212)
-          : Colors.white,
-    ),
-    scaffoldBackgroundColor: brightness == Brightness.dark
-        ? const Color(0xFF080B0A)
-        : const Color(0xFFF6F8F6),
-    fontFamily: 'Roboto',
-  );
+  ThemeData _theme(Brightness brightness) => AppTheme.forBrightness(brightness);
 
   @override
   Widget build(BuildContext context) => Consumer<ThemeProvider>(

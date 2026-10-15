@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../themes/app_theme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math';
@@ -376,7 +377,7 @@ class _AccountScreenState extends State<AccountScreen>
         _userStats['favoriteGenres'] as Map<String, int>;
     final List<Color> colors = [
       Colors.red,
-      Colors.green,
+      AppTheme.accent,
       Colors.blue,
       Colors.amber,
       Colors.purple,
@@ -417,7 +418,10 @@ class _AccountScreenState extends State<AccountScreen>
                 ),
               ),
               Spacer(),
-              Text(count.toString(), style: TextStyle(color: Colors.grey[400])),
+              Text(
+                count.toString(),
+                style: TextStyle(color: AppTheme.mutedText),
+              ),
             ],
           ),
           SizedBox(height: 4),
@@ -426,7 +430,7 @@ class _AccountScreenState extends State<AccountScreen>
             width: double.infinity,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(4),
-              color: Colors.grey[800],
+              color: AppTheme.elevatedSurface,
             ),
             child: FractionallySizedBox(
               alignment: Alignment.centerLeft,
@@ -449,13 +453,13 @@ class _AccountScreenState extends State<AccountScreen>
     final Map<String, int> data =
         _userStats['listeningByDay'] as Map<String, int>;
     final List<Color> colors = [
-      Colors.green.shade200,
-      Colors.green.shade300,
-      Colors.green.shade400,
-      Colors.green.shade500,
-      Colors.green.shade600,
-      Colors.green.shade700,
-      Colors.green.shade800,
+      AppTheme.accent.withValues(alpha: 0.32),
+      AppTheme.accent.withValues(alpha: 0.42),
+      AppTheme.accent.withValues(alpha: 0.52),
+      AppTheme.accent.withValues(alpha: 0.62),
+      AppTheme.accent.withValues(alpha: 0.72),
+      AppTheme.accent.withValues(alpha: 0.84),
+      AppTheme.accent,
     ];
     final int maxValue = max(1, data.values.reduce(max));
 
@@ -473,7 +477,7 @@ class _AccountScreenState extends State<AccountScreen>
               margin: EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(4),
-                color: Colors.grey[800],
+                color: AppTheme.elevatedSurface,
               ),
               alignment: Alignment.bottomCenter,
               child: FractionallySizedBox(
@@ -489,7 +493,7 @@ class _AccountScreenState extends State<AccountScreen>
             SizedBox(height: 8),
             Text(
               entry.key,
-              style: TextStyle(color: Colors.grey[400], fontSize: 12),
+              style: TextStyle(color: AppTheme.mutedText, fontSize: 12),
             ),
             SizedBox(height: 4),
             Text(
@@ -512,7 +516,7 @@ class _AccountScreenState extends State<AccountScreen>
     final currentTrack = playback.currentTrack;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.canvas,
       body: Stack(
         children: [
           // Градиентный фон
@@ -521,14 +525,17 @@ class _AccountScreenState extends State<AccountScreen>
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.center,
-                colors: [Colors.green.withValues(alpha: 0.6), Colors.black],
+                colors: [
+                  AppTheme.accent.withValues(alpha: 0.6),
+                  AppTheme.canvas,
+                ],
               ),
             ),
           ),
 
           // Основной контент
           _isLoading
-              ? Center(child: CircularProgressIndicator(color: Colors.green))
+              ? Center(child: CircularProgressIndicator(color: AppTheme.accent))
               : SafeArea(
                   child: Column(
                     children: [
@@ -539,17 +546,17 @@ class _AccountScreenState extends State<AccountScreen>
                       Container(
                         margin: EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
-                          color: Colors.grey[900],
+                          color: AppTheme.surface,
                           borderRadius: BorderRadius.circular(25),
                         ),
                         child: TabBar(
                           controller: _tabController,
                           indicator: BoxDecoration(
                             borderRadius: BorderRadius.circular(25),
-                            color: Colors.green,
+                            color: AppTheme.accent,
                           ),
                           labelColor: Colors.white,
-                          unselectedLabelColor: Colors.grey,
+                          unselectedLabelColor: AppTheme.mutedText,
                           tabs: [
                             Tab(text: 'Профиль'),
                             Tab(text: 'Статистика'),
@@ -624,7 +631,7 @@ class _AccountScreenState extends State<AccountScreen>
             child: Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.grey[900]!.withValues(alpha: 0.8),
+                color: AppTheme.surface!.withValues(alpha: 0.8),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -654,8 +661,8 @@ class _AccountScreenState extends State<AccountScreen>
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: _isEditing
-                    ? Colors.green
-                    : Colors.grey[900]!.withValues(alpha: 0.8),
+                    ? AppTheme.accent
+                    : AppTheme.surface!.withValues(alpha: 0.8),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -680,7 +687,7 @@ class _AccountScreenState extends State<AccountScreen>
             children: [
               CircleAvatar(
                 radius: 60,
-                backgroundColor: Colors.grey[800],
+                backgroundColor: AppTheme.elevatedSurface,
                 backgroundImage: _profileImageUrl != null
                     ? NetworkImage(_profileImageUrl!)
                     : null,
@@ -695,7 +702,7 @@ class _AccountScreenState extends State<AccountScreen>
                   child: Container(
                     padding: EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.green,
+                      color: AppTheme.accent,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(Icons.edit, color: Colors.white, size: 18),
@@ -713,14 +720,14 @@ class _AccountScreenState extends State<AccountScreen>
             style: TextStyle(color: Colors.white),
             decoration: InputDecoration(
               labelText: 'Имя',
-              labelStyle: TextStyle(color: Colors.grey),
+              labelStyle: TextStyle(color: AppTheme.mutedText),
               filled: true,
-              fillColor: Colors.grey[900],
+              fillColor: AppTheme.surface,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
               ),
-              prefixIcon: Icon(Icons.person, color: Colors.grey),
+              prefixIcon: Icon(Icons.person, color: AppTheme.mutedText),
             ),
           )
         else
@@ -743,21 +750,21 @@ class _AccountScreenState extends State<AccountScreen>
             style: TextStyle(color: Colors.white),
             decoration: InputDecoration(
               labelText: 'Email',
-              labelStyle: TextStyle(color: Colors.grey),
+              labelStyle: TextStyle(color: AppTheme.mutedText),
               filled: true,
-              fillColor: Colors.grey[900],
+              fillColor: AppTheme.surface,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
               ),
-              prefixIcon: Icon(Icons.email, color: Colors.grey),
+              prefixIcon: Icon(Icons.email, color: AppTheme.mutedText),
             ),
           )
         else
           Center(
             child: Text(
               _userEmail ?? 'email@example.com',
-              style: TextStyle(color: Colors.grey, fontSize: 16),
+              style: TextStyle(color: AppTheme.mutedText, fontSize: 16),
             ),
           ),
         SizedBox(height: 20),
@@ -781,14 +788,14 @@ class _AccountScreenState extends State<AccountScreen>
                 style: TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'URL изображения',
-                  labelStyle: TextStyle(color: Colors.grey),
+                  labelStyle: TextStyle(color: AppTheme.mutedText),
                   filled: true,
-                  fillColor: Colors.grey[900],
+                  fillColor: AppTheme.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
                   ),
-                  prefixIcon: Icon(Icons.image, color: Colors.grey),
+                  prefixIcon: Icon(Icons.image, color: AppTheme.mutedText),
                 ),
               ),
               SizedBox(height: 30),
@@ -809,14 +816,14 @@ class _AccountScreenState extends State<AccountScreen>
                 obscureText: true,
                 decoration: InputDecoration(
                   labelText: 'Текущий пароль',
-                  labelStyle: TextStyle(color: Colors.grey),
+                  labelStyle: TextStyle(color: AppTheme.mutedText),
                   filled: true,
-                  fillColor: Colors.grey[900],
+                  fillColor: AppTheme.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
                   ),
-                  prefixIcon: Icon(Icons.lock, color: Colors.grey),
+                  prefixIcon: Icon(Icons.lock, color: AppTheme.mutedText),
                 ),
               ),
               SizedBox(height: 10),
@@ -826,14 +833,14 @@ class _AccountScreenState extends State<AccountScreen>
                 obscureText: true,
                 decoration: InputDecoration(
                   labelText: 'Новый пароль',
-                  labelStyle: TextStyle(color: Colors.grey),
+                  labelStyle: TextStyle(color: AppTheme.mutedText),
                   filled: true,
-                  fillColor: Colors.grey[900],
+                  fillColor: AppTheme.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
                   ),
-                  prefixIcon: Icon(Icons.lock_open, color: Colors.grey),
+                  prefixIcon: Icon(Icons.lock_open, color: AppTheme.mutedText),
                 ),
               ),
               SizedBox(height: 10),
@@ -843,14 +850,14 @@ class _AccountScreenState extends State<AccountScreen>
                 obscureText: true,
                 decoration: InputDecoration(
                   labelText: 'Подтвердите новый пароль',
-                  labelStyle: TextStyle(color: Colors.grey),
+                  labelStyle: TextStyle(color: AppTheme.mutedText),
                   filled: true,
-                  fillColor: Colors.grey[900],
+                  fillColor: AppTheme.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
                   ),
-                  prefixIcon: Icon(Icons.lock_open, color: Colors.grey),
+                  prefixIcon: Icon(Icons.lock_open, color: AppTheme.mutedText),
                 ),
               ),
             ],
@@ -884,7 +891,7 @@ class _AccountScreenState extends State<AccountScreen>
                 icon: Icons.access_time,
                 title: 'Часов музыки прослушано',
                 value: _userStats['totalListened'].toString(),
-                color: Colors.green,
+                color: AppTheme.accent,
               ),
 
               // Карточка Premium подписки
@@ -901,7 +908,7 @@ class _AccountScreenState extends State<AccountScreen>
             icon: Icon(Icons.logout),
             label: Text('Выйти'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey[800],
+              backgroundColor: AppTheme.elevatedSurface,
               foregroundColor: Colors.white,
               padding: EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -946,7 +953,7 @@ class _AccountScreenState extends State<AccountScreen>
                 title: 'Треков',
                 value: _userStats['recentlyPlayedCount'].toString(),
                 icon: Icons.music_note,
-                color: Colors.green,
+                color: AppTheme.accent,
               ),
             ),
           ],
@@ -966,7 +973,7 @@ class _AccountScreenState extends State<AccountScreen>
         Container(
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey[900],
+            color: AppTheme.surface,
             borderRadius: BorderRadius.circular(10),
           ),
           child: _buildWeeklyListeningVisualization(),
@@ -986,7 +993,7 @@ class _AccountScreenState extends State<AccountScreen>
         Container(
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey[900],
+            color: AppTheme.surface,
             borderRadius: BorderRadius.circular(10),
           ),
           child: _buildGenresVisualization(),
@@ -1039,7 +1046,7 @@ class _AccountScreenState extends State<AccountScreen>
           icon: Icon(Icons.download),
           label: Text('Экспортировать статистику'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey[900],
+            backgroundColor: AppTheme.surface,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
@@ -1160,7 +1167,7 @@ class _AccountScreenState extends State<AccountScreen>
         ),
         SizedBox(height: 16),
         ListTile(
-          leading: Icon(Icons.battery_std, color: Colors.green),
+          leading: Icon(Icons.battery_std, color: AppTheme.accent),
           title: Text('Заряд батареи', style: TextStyle(color: Colors.white)),
           trailing: FutureBuilder<int?>(
             future: DeviceInfoService().batteryLevel(),
@@ -1168,7 +1175,7 @@ class _AccountScreenState extends State<AccountScreen>
               snapshot.hasError || snapshot.data == null
                   ? 'Только Android'
                   : '${snapshot.data}%',
-              style: TextStyle(color: Colors.grey[400]),
+              style: TextStyle(color: AppTheme.mutedText),
             ),
           ),
         ),
@@ -1178,7 +1185,7 @@ class _AccountScreenState extends State<AccountScreen>
         }.contains(defaultTargetPlatform))
           Consumer<AudioPlayerAlternativeProvider>(
             builder: (context, player, _) => SwitchListTile(
-              secondary: const Icon(Icons.vibration, color: Colors.green),
+              secondary: const Icon(Icons.vibration, color: AppTheme.accent),
               title: const Text(
                 'Переключать трек встряхиванием',
                 style: TextStyle(color: Colors.white),
@@ -1189,7 +1196,7 @@ class _AccountScreenState extends State<AccountScreen>
               ),
               value: player.shakeToSkipEnabled,
               onChanged: player.setShakeToSkipEnabled,
-              activeColor: Colors.green,
+              activeColor: AppTheme.accent,
             ),
           ),
         _buildActionTile(
@@ -1240,7 +1247,7 @@ class _AccountScreenState extends State<AccountScreen>
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[900],
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -1260,7 +1267,7 @@ class _AccountScreenState extends State<AccountScreen>
               children: [
                 Text(
                   title,
-                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                  style: TextStyle(color: AppTheme.mutedText, fontSize: 14),
                 ),
                 SizedBox(height: 4),
                 Text(
@@ -1356,7 +1363,7 @@ class _AccountScreenState extends State<AccountScreen>
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[900],
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(10),
         image: DecorationImage(
           image: NetworkImage(
@@ -1364,7 +1371,7 @@ class _AccountScreenState extends State<AccountScreen>
           ),
           fit: BoxFit.cover,
           colorFilter: ColorFilter.mode(
-            Colors.black.withValues(alpha: 0.5),
+            AppTheme.canvas.withValues(alpha: 0.5),
             BlendMode.darken,
           ),
         ),
@@ -1391,7 +1398,7 @@ class _AccountScreenState extends State<AccountScreen>
               children: [
                 Text(
                   'На основе ваших предпочтений',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                  style: TextStyle(color: AppTheme.mutedText, fontSize: 14),
                 ),
                 SizedBox(height: 4),
                 Text(
@@ -1414,7 +1421,7 @@ class _AccountScreenState extends State<AccountScreen>
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppTheme.accent,
                     foregroundColor: Colors.white,
                     minimumSize: Size(100, 30),
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1437,7 +1444,7 @@ class _AccountScreenState extends State<AccountScreen>
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[900],
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(10),
         image: DecorationImage(
           image: NetworkImage(
@@ -1445,7 +1452,7 @@ class _AccountScreenState extends State<AccountScreen>
           ),
           fit: BoxFit.cover,
           colorFilter: ColorFilter.mode(
-            Colors.black.withValues(alpha: 0.5),
+            AppTheme.canvas.withValues(alpha: 0.5),
             BlendMode.darken,
           ),
         ),
@@ -1472,7 +1479,7 @@ class _AccountScreenState extends State<AccountScreen>
               children: [
                 Text(
                   'Обновляется каждый понедельник',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                  style: TextStyle(color: AppTheme.mutedText, fontSize: 14),
                 ),
                 SizedBox(height: 4),
                 Text(
@@ -1495,7 +1502,7 @@ class _AccountScreenState extends State<AccountScreen>
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppTheme.accent,
                     foregroundColor: Colors.white,
                     minimumSize: Size(100, 30),
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1523,7 +1530,7 @@ class _AccountScreenState extends State<AccountScreen>
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[900],
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -1540,7 +1547,10 @@ class _AccountScreenState extends State<AccountScreen>
             ),
           ),
           SizedBox(height: 8),
-          Text(title, style: TextStyle(color: Colors.grey[400], fontSize: 14)),
+          Text(
+            title,
+            style: TextStyle(color: AppTheme.mutedText, fontSize: 14),
+          ),
         ],
       ),
     );
@@ -1552,14 +1562,14 @@ class _AccountScreenState extends State<AccountScreen>
       margin: EdgeInsets.only(bottom: 10),
       padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.grey[900],
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 25,
-            backgroundColor: Colors.grey[800],
+            backgroundColor: AppTheme.elevatedSurface,
             backgroundImage: NetworkImage(
               'https://api.dicebear.com/7.x/initials/png?seed=$name&radius=50',
             ),
@@ -1580,12 +1590,12 @@ class _AccountScreenState extends State<AccountScreen>
                 SizedBox(height: 4),
                 Text(
                   '$count прослушиваний',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                  style: TextStyle(color: AppTheme.mutedText, fontSize: 14),
                 ),
               ],
             ),
           ),
-          Icon(Icons.play_circle_filled, color: Colors.green, size: 36),
+          Icon(Icons.play_circle_filled, color: AppTheme.accent, size: 36),
         ],
       ),
     );
@@ -1603,7 +1613,7 @@ class _AccountScreenState extends State<AccountScreen>
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.grey[900],
+          color: AppTheme.surface,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -1618,10 +1628,10 @@ class _AccountScreenState extends State<AccountScreen>
             ),
             Text(
               value,
-              style: TextStyle(color: Colors.grey[400], fontSize: 14),
+              style: TextStyle(color: AppTheme.mutedText, fontSize: 14),
             ),
             SizedBox(width: 8),
-            Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
+            Icon(Icons.arrow_forward_ios, color: AppTheme.mutedText, size: 16),
           ],
         ),
       ),
@@ -1638,7 +1648,7 @@ class _AccountScreenState extends State<AccountScreen>
     return Container(
       padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.grey[900],
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -1654,7 +1664,7 @@ class _AccountScreenState extends State<AccountScreen>
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: Colors.green,
+            activeThumbColor: AppTheme.accent,
           ),
         ],
       ),
@@ -1673,7 +1683,7 @@ class _AccountScreenState extends State<AccountScreen>
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.grey[900],
+          color: AppTheme.surface,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -1691,12 +1701,12 @@ class _AccountScreenState extends State<AccountScreen>
                   SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                    style: TextStyle(color: AppTheme.mutedText, fontSize: 12),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
+            Icon(Icons.arrow_forward_ios, color: AppTheme.mutedText, size: 16),
           ],
         ),
       ),
@@ -1709,7 +1719,7 @@ class _AccountScreenState extends State<AccountScreen>
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: Colors.grey[900],
+          backgroundColor: AppTheme.surface,
           title: Text('Выберите язык', style: TextStyle(color: Colors.white)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1729,7 +1739,7 @@ class _AccountScreenState extends State<AccountScreen>
     return ListTile(
       title: Text(language, style: TextStyle(color: Colors.white)),
       trailing: _userSettings['language'] == language
-          ? Icon(Icons.check, color: Colors.green)
+          ? Icon(Icons.check, color: AppTheme.accent)
           : null,
       onTap: () {
         setState(() {
@@ -1752,7 +1762,7 @@ class _AccountScreenState extends State<AccountScreen>
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: Colors.grey[900],
+          backgroundColor: AppTheme.surface,
           title: Text('Качество аудио', style: TextStyle(color: Colors.white)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1780,9 +1790,9 @@ class _AccountScreenState extends State<AccountScreen>
   Widget _buildAudioQualityOption(String quality, String description) {
     return ListTile(
       title: Text(quality, style: TextStyle(color: Colors.white)),
-      subtitle: Text(description, style: TextStyle(color: Colors.grey)),
+      subtitle: Text(description, style: TextStyle(color: AppTheme.mutedText)),
       trailing: _userSettings['audioQuality'] == quality
-          ? Icon(Icons.check, color: Colors.green)
+          ? Icon(Icons.check, color: AppTheme.accent)
           : null,
       onTap: () {
         setState(() {
@@ -1799,16 +1809,19 @@ class _AccountScreenState extends State<AccountScreen>
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: Colors.grey[900],
+          backgroundColor: AppTheme.surface,
           title: Text('Очистить кэш?', style: TextStyle(color: Colors.white)),
           content: Text(
             'Это действие удалит все временные файлы, но сохранит ваши плейлисты и настройки.',
-            style: TextStyle(color: Colors.grey[300]),
+            style: TextStyle(color: AppTheme.mutedText),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Отмена', style: TextStyle(color: Colors.grey)),
+              child: Text(
+                'Отмена',
+                style: TextStyle(color: AppTheme.mutedText),
+              ),
             ),
             TextButton(
               onPressed: () {
@@ -1817,7 +1830,7 @@ class _AccountScreenState extends State<AccountScreen>
                   context,
                 ).showSnackBar(SnackBar(content: Text('Кэш успешно очищен')));
               },
-              child: Text('Очистить', style: TextStyle(color: Colors.green)),
+              child: Text('Очистить', style: TextStyle(color: AppTheme.accent)),
             ),
           ],
         );
@@ -1831,7 +1844,7 @@ class _AccountScreenState extends State<AccountScreen>
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: Colors.grey[900],
+          backgroundColor: AppTheme.surface,
           title: Text('О приложении', style: TextStyle(color: Colors.white)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1846,7 +1859,7 @@ class _AccountScreenState extends State<AccountScreen>
                 ),
               ),
               SizedBox(height: 8),
-              Text('Версия 1.0.0', style: TextStyle(color: Colors.grey[400])),
+              Text('Версия 1.0.0', style: TextStyle(color: AppTheme.mutedText)),
               SizedBox(height: 16),
               Text(
                 'Музыкальное приложение для воспроизведения, организации и обмена музыкой. Создавайте плейлисты, открывайте новую музыку и наслаждайтесь высоким качеством звучания.',
@@ -1855,14 +1868,14 @@ class _AccountScreenState extends State<AccountScreen>
               SizedBox(height: 16),
               Text(
                 '© 2025 Justify Team',
-                style: TextStyle(color: Colors.grey[400]),
+                style: TextStyle(color: AppTheme.mutedText),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Закрыть', style: TextStyle(color: Colors.green)),
+              child: Text('Закрыть', style: TextStyle(color: AppTheme.accent)),
             ),
           ],
         );

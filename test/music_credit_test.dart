@@ -75,4 +75,33 @@ void main() {
     );
     expect(find.textContaining('CC BY'), findsNothing);
   });
+
+  testWidgets('Jamendo tracks show API-provided attribution and license', (
+    tester,
+  ) async {
+    await showCredit(
+      tester,
+      Track(
+        id: -123,
+        name: 'Open Sky',
+        artist: 'Example Artist',
+        audioFileUrl: 'https://cdn.example.test/open-sky.mp3',
+        duration: 210,
+        source: 'jamendo',
+        licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+        sourceUrl: 'https://www.jamendo.com/track/123',
+      ),
+    );
+
+    expect(find.text('Авторство: Example Artist'), findsOneWidget);
+    expect(find.textContaining('Jamendo'), findsOneWidget);
+    expect(find.textContaining('Авторство'), findsOneWidget);
+    expect(
+      find.widgetWithText(
+        SelectableText,
+        'https://creativecommons.org/licenses/by/4.0/',
+      ),
+      findsOneWidget,
+    );
+  });
 }

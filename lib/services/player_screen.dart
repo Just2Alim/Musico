@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../themes/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui';
 import '../providers/audio_player_provider.dart';
@@ -50,10 +51,14 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   void _loadTrack() {
     final int trackId = widget.arguments['trackId'];
-    // Загружаем трек через провайдер
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<PlaybackCubit>().loadTrackById(trackId);
+      final playback = context.read<PlaybackCubit>();
+      // A selected search result may already be playing from an external
+      // catalog. Re-fetching it by ID would incorrectly query Supabase.
+      if (playback.state.currentTrack?.id != trackId) {
+        playback.loadTrackById(trackId);
+      }
     });
   }
 
@@ -126,7 +131,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.grey[900],
+      backgroundColor: AppTheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -148,7 +153,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                       ),
                     ),
                   ),
-                  const Divider(color: Colors.grey),
+                  const Divider(color: AppTheme.mutedText),
                   if (MusicCredit.supports(track))
                     ListTile(
                       leading: const Icon(Icons.copyright, color: Colors.white),
@@ -198,28 +203,31 @@ class _PlayerScreenState extends State<PlayerScreen>
                       );
                     },
                   ),
-                  Consumer<AudioPlayerAlternativeProvider>(
-                    builder: (context, provider, child) {
-                      return ListTile(
-                        leading: Icon(
-                          track.isLiked
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          color: track.isLiked ? Colors.green : Colors.white,
-                        ),
-                        title: Text(
-                          track.isLiked
-                              ? 'Удалить из избранного'
-                              : 'Добавить в избранное',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        onTap: () async {
-                          await _toggleFavorite(track, provider);
-                          Navigator.pop(context);
-                        },
-                      );
-                    },
-                  ),
+                  if (track.source == 'supabase')
+                    Consumer<AudioPlayerAlternativeProvider>(
+                      builder: (context, provider, child) {
+                        return ListTile(
+                          leading: Icon(
+                            track.isLiked
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            color: track.isLiked
+                                ? AppTheme.accent
+                                : Colors.white,
+                          ),
+                          title: Text(
+                            track.isLiked
+                                ? 'Удалить из избранного'
+                                : 'Добавить в избранное',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          onTap: () async {
+                            await _toggleFavorite(track, provider);
+                            if (context.mounted) Navigator.pop(context);
+                          },
+                        );
+                      },
+                    ),
                   ListTile(
                     leading: const Icon(Icons.share, color: Colors.white),
                     title: const Text(
@@ -253,23 +261,24 @@ class _PlayerScreenState extends State<PlayerScreen>
                       _showTrackInfoDialog(context, track);
                     },
                   ),
-                  ListTile(
-                    leading: const Icon(
-                      Icons.playlist_add,
-                      color: Colors.white,
-                    ),
-                    title: const Text(
-                      'Добавить в плейлист',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    onTap: () {
-                      // Закрываем текущий bottom sheet
-                      Navigator.pop(context);
+                  if (track.source == 'supabase')
+                    ListTile(
+                      leading: const Icon(
+                        Icons.playlist_add,
+                        color: Colors.white,
+                      ),
+                      title: const Text(
+                        'Добавить в плейлист',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      onTap: () {
+                        // Закрываем текущий bottom sheet
+                        Navigator.pop(context);
 
-                      // Открываем новый bottom sheet для выбора плейлиста
-                      _showAddToPlaylistBottomSheet(context, track);
-                    },
-                  ),
+                        // Открываем новый bottom sheet для выбора плейлиста
+                        _showAddToPlaylistBottomSheet(context, track);
+                      },
+                    ),
                   const SizedBox(height: 20),
                 ],
               ),
@@ -297,7 +306,7 @@ class _PlayerScreenState extends State<PlayerScreen>
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.grey[900],
+      backgroundColor: AppTheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -318,13 +327,13 @@ class _PlayerScreenState extends State<PlayerScreen>
                     ),
                   ),
                 ),
-                const Divider(color: Colors.grey),
+                const Divider(color: AppTheme.mutedText),
 
                 // Опция создания нового плейлиста
                 ListTile(
                   leading: const Icon(
                     Icons.add_circle_outline,
-                    color: Colors.green,
+                    color: AppTheme.accent,
                   ),
                   title: const Text(
                     'Создать новый плейлист',
@@ -336,19 +345,21 @@ class _PlayerScreenState extends State<PlayerScreen>
                   },
                 ),
 
-                const Divider(color: Colors.grey),
+                const Divider(color: AppTheme.mutedText),
 
                 // Список существующих плейлистов
                 Expanded(
                   child: _isLoadingPlaylists
                       ? const Center(
-                          child: CircularProgressIndicator(color: Colors.green),
+                          child: CircularProgressIndicator(
+                            color: AppTheme.accent,
+                          ),
                         )
                       : _userPlaylists.isEmpty
                       ? const Center(
                           child: Text(
                             'У вас пока нет плейлистов',
-                            style: TextStyle(color: Colors.grey),
+                            style: TextStyle(color: AppTheme.mutedText),
                           ),
                         )
                       : ListView.builder(
@@ -369,7 +380,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                                           fit: BoxFit.cover,
                                         )
                                       : null,
-                                  color: Colors.grey[800],
+                                  color: AppTheme.elevatedSurface,
                                 ),
                                 child: playlist['imageUrl'] == null
                                     ? const Icon(
@@ -385,7 +396,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                               ),
                               subtitle: Text(
                                 '${playlist['track_count'] ?? playlist['trackCount'] ?? 0} треков',
-                                style: TextStyle(color: Colors.grey[400]),
+                                style: TextStyle(color: AppTheme.mutedText),
                               ),
                               onTap: () {
                                 _addToPlaylist(track.id, playlist['id']);
@@ -409,7 +420,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: Colors.grey[900],
+          backgroundColor: AppTheme.surface,
           title: const Text(
             'Создать плейлист',
             style: TextStyle(color: Colors.white),
@@ -419,9 +430,9 @@ class _PlayerScreenState extends State<PlayerScreen>
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: 'Название плейлиста',
-              hintStyle: TextStyle(color: Colors.grey[600]),
+              hintStyle: TextStyle(color: AppTheme.mutedText),
               filled: true,
-              fillColor: Colors.grey[800],
+              fillColor: AppTheme.elevatedSurface,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,
@@ -431,7 +442,10 @@ class _PlayerScreenState extends State<PlayerScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена', style: TextStyle(color: Colors.grey)),
+              child: const Text(
+                'Отмена',
+                style: TextStyle(color: AppTheme.mutedText),
+              ),
             ),
             TextButton(
               onPressed: () async {
@@ -446,7 +460,7 @@ class _PlayerScreenState extends State<PlayerScreen>
               },
               child: const Text(
                 'Создать',
-                style: TextStyle(color: Colors.green),
+                style: TextStyle(color: AppTheme.accent),
               ),
             ),
           ],
@@ -486,7 +500,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: Colors.grey[900],
+          backgroundColor: AppTheme.surface,
           title: const Text(
             'Информация о треке',
             style: TextStyle(color: Colors.white),
@@ -516,7 +530,7 @@ class _PlayerScreenState extends State<PlayerScreen>
               onPressed: () => Navigator.pop(context),
               child: const Text(
                 'Закрыть',
-                style: TextStyle(color: Colors.green),
+                style: TextStyle(color: AppTheme.accent),
               ),
             ),
           ],
@@ -532,7 +546,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         Text(
           '$label: ',
           style: const TextStyle(
-            color: Colors.grey,
+            color: AppTheme.mutedText,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -554,7 +568,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         final duration = playback.duration;
 
         return Scaffold(
-          backgroundColor: Colors.black,
+          backgroundColor: AppTheme.canvas,
           body: track == null
               ? Center(
                   child: Column(
@@ -590,7 +604,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
                         child: Container(
-                          color: Colors.black.withValues(alpha: 0.7),
+                          color: AppTheme.canvas.withValues(alpha: 0.7),
                         ),
                       ),
                     ),
@@ -646,7 +660,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                                   borderRadius: BorderRadius.circular(15),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(
+                                      color: AppTheme.canvas.withValues(
                                         alpha: 0.3,
                                       ),
                                       spreadRadius: 1,
@@ -723,7 +737,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                                             Text(
                                               track.artist,
                                               style: const TextStyle(
-                                                color: Colors.grey,
+                                                color: AppTheme.mutedText,
                                                 fontSize: 16,
                                               ),
                                               maxLines: 1,
@@ -738,7 +752,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                                               ? Icons.favorite
                                               : Icons.favorite_border,
                                           color: track.isLiked
-                                              ? Colors.green
+                                              ? AppTheme.accent
                                               : Colors.white,
                                           size: 30,
                                         ),
@@ -775,14 +789,14 @@ class _PlayerScreenState extends State<PlayerScreen>
                                         Text(
                                           _formatDuration(position),
                                           style: const TextStyle(
-                                            color: Colors.grey,
+                                            color: AppTheme.mutedText,
                                             fontSize: 12,
                                           ),
                                         ),
                                         Text(
                                           _formatDuration(duration),
                                           style: const TextStyle(
-                                            color: Colors.grey,
+                                            color: AppTheme.mutedText,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -800,7 +814,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                                           icon: Icon(
                                             Icons.shuffle,
                                             color: playback.shuffleEnabled
-                                                ? Colors.green
+                                                ? AppTheme.accent
                                                 : Colors.white,
                                           ),
                                           onPressed: () {
@@ -859,7 +873,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                                           icon: Icon(
                                             Icons.repeat,
                                             color: playback.repeatEnabled
-                                                ? Colors.green
+                                                ? AppTheme.accent
                                                 : Colors.white,
                                           ),
                                           onPressed: () {
@@ -911,7 +925,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         height: 70,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.green.withValues(alpha: 0.7),
+          color: AppTheme.accent.withValues(alpha: 0.7),
         ),
         child: const CircularProgressIndicator(
           color: Colors.white,
@@ -925,10 +939,10 @@ class _PlayerScreenState extends State<PlayerScreen>
       height: 70,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.green,
+        color: AppTheme.accent,
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withValues(alpha: 0.3),
+            color: AppTheme.accent.withValues(alpha: 0.3),
             spreadRadius: 1,
             blurRadius: 8,
             offset: const Offset(0, 2),

@@ -148,7 +148,7 @@ void main() {
           ],
         });
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Playlists'));
+        await tester.tap(find.text('Плейлисты'));
         await tester.pumpAndSettle();
         expect(find.text('Private user A playlist'), findsOneWidget);
         branch.value = 1;
@@ -158,7 +158,7 @@ void main() {
         branch.value = 0;
         await tester.pumpAndSettle();
         expect(find.text('Private user A playlist'), findsNothing);
-        expect(find.text('Browse Categories'), findsOneWidget);
+        expect(find.text('Обзор категорий'), findsOneWidget);
         expect(
           tester.widget<TextField>(find.byType(TextField)).controller!.text,
           isEmpty,
@@ -182,7 +182,7 @@ void main() {
         ],
       });
       await tester.pumpAndSettle();
-      expect(find.text('Browse Categories'), findsOneWidget);
+      expect(find.text('Обзор категорий'), findsOneWidget);
       expect(find.text('Playlists'), findsNothing);
       expect(find.byType(CircularProgressIndicator), findsNothing);
     },
@@ -195,7 +195,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '');
     await tester.pump(const Duration(milliseconds: 400));
     expect(music.requests, isEmpty);
-    expect(find.text('Browse Categories'), findsOneWidget);
+    expect(find.text('Обзор категорий'), findsOneWidget);
   });
 
   testWidgets('old request cannot replace the results of a newer search', (
@@ -225,7 +225,7 @@ void main() {
     await tester.enterText(find.byType(TextField), 'j');
     music.requests['jazz']!.complete(_results('Stale result'));
     await tester.pumpAndSettle();
-    expect(find.text('Browse Categories'), findsOneWidget);
+    expect(find.text('Обзор категорий'), findsOneWidget);
     expect(find.text('Stale result'), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });

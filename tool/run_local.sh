@@ -15,6 +15,9 @@ flutter_args=(
   --dart-define="SUPABASE_URL=$SUPABASE_URL"
   --dart-define="SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY"
 )
+if [[ -n "${JAMENDO_CLIENT_ID:-}" ]]; then
+  flutter_args+=(--dart-define="JAMENDO_CLIENT_ID=$JAMENDO_CLIENT_ID")
+fi
 if [[ -n "${GOOGLE_MAPS_API_KEY:-}" ]]; then
   flutter_args+=(--dart-define="GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY")
   printf 'GOOGLE_MAPS_API_KEY = %s\n' "$GOOGLE_MAPS_API_KEY" > ios/Flutter/Local.xcconfig

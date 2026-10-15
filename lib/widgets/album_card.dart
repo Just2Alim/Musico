@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../themes/app_theme.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'track_artwork.dart';
 
 class AlbumCard extends StatelessWidget {
   final int id;
@@ -75,17 +75,12 @@ class AlbumCard extends StatelessWidget {
         ),
       ],
     ),
-    child: imageUrl == null
-        ? Center(child: Icon(Icons.album, size: 60, color: AppTheme.mutedText))
-        : ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: CachedNetworkImage(
-              imageUrl: imageUrl!,
-              fit: BoxFit.cover,
-              placeholder: (_, __) =>
-                  const Center(child: CircularProgressIndicator()),
-              errorWidget: (_, __, ___) => const Icon(Icons.album),
-            ),
-          ),
+    child: TrackArtwork(
+      imageUrl: imageUrl,
+      title: title,
+      artist: subtitle ?? 'Musico',
+      borderRadius: 8,
+      showLabel: false,
+    ),
   );
 }

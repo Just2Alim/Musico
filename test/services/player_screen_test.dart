@@ -227,7 +227,7 @@ void main() {
       await _mount(tester, size: size);
       await tester.pumpAndSettle();
       expect(find.text('Moonlight Beach'), findsOneWidget);
-      expect(find.byIcon(Icons.music_note), findsOneWidget);
+      expect(find.byIcon(Icons.graphic_eq_rounded), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

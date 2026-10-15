@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../features/player/playback_cubit.dart';
 import '../providers/music_data_provider.dart';
 import '../widgets/mini_player.dart';
+import '../widgets/track_artwork.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({Key? key}) : super(key: key);
@@ -343,25 +344,17 @@ class _SearchScreenState extends State<SearchScreen>
         final track = tracks[index];
         final isFavorite = favoriteIds.contains(track['id']);
         return ListTile(
-          leading: Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(5),
-              image:
-                  (track['coverImageUrl'] ?? track['cover_image_url']) != null
-                  ? DecorationImage(
-                      image: NetworkImage(
-                        track['coverImageUrl'] ?? track['cover_image_url'],
-                      ),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-              color: AppTheme.elevatedSurface,
+          leading: SizedBox.square(
+            dimension: 50,
+            child: TrackArtwork(
+              imageUrl:
+                  (track['coverImageUrl'] ?? track['cover_image_url'])
+                      as String?,
+              title: track['name'] as String? ?? 'Трек',
+              artist: track['artist'] as String? ?? 'Исполнитель',
+              borderRadius: 5,
+              showLabel: false,
             ),
-            child: (track['coverImageUrl'] ?? track['cover_image_url']) == null
-                ? const Icon(Icons.music_note, color: Colors.white)
-                : null,
           ),
           title: Text(
             track['name'] ?? 'Unknown Track',

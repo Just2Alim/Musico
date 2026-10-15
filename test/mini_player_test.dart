@@ -24,7 +24,7 @@ void main() {
           ),
         ),
       );
-      expect(find.byIcon(Icons.music_note), findsOneWidget);
+      expect(find.byIcon(Icons.graphic_eq_rounded), findsOneWidget);
       await tester.tap(find.byIcon(Icons.play_circle_filled));
       await tester.tap(find.byIcon(Icons.skip_next));
       await tester.tap(find.byIcon(Icons.favorite));

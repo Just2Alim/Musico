@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../themes/app_theme.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'track_artwork.dart';
 
 class TrackListItem extends StatelessWidget {
   final int id;
@@ -43,25 +43,13 @@ class TrackListItem extends StatelessWidget {
                   ),
                 ],
               ),
-              child: coverUrl == null
-                  ? Center(
-                      child: Icon(
-                        Icons.music_note,
-                        size: 40,
-                        color: AppTheme.mutedText,
-                      ),
-                    )
-                  : ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(
-                        imageUrl: coverUrl!,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) =>
-                            const Center(child: CircularProgressIndicator()),
-                        errorWidget: (_, __, ___) =>
-                            const Icon(Icons.music_note),
-                      ),
-                    ),
+              child: TrackArtwork(
+                imageUrl: coverUrl,
+                title: title,
+                artist: artist,
+                borderRadius: 8,
+                showLabel: false,
+              ),
             ),
             const SizedBox(height: 10),
             Text(

@@ -33,7 +33,7 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text(title), findsOneWidget);
       expect(find.text(subtitle), findsOneWidget);
-      expect(find.byIcon(Icons.album), findsOneWidget);
+      expect(find.byIcon(Icons.graphic_eq_rounded), findsOneWidget);
       final titleText = tester.widget<Text>(find.text(title));
       expect(titleText.maxLines, 1);
       expect(titleText.overflow, TextOverflow.ellipsis);
@@ -56,6 +56,6 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     expect(find.text('Short title'), findsOneWidget);
-    expect(find.byIcon(Icons.album), findsOneWidget);
+    expect(find.byIcon(Icons.graphic_eq_rounded), findsOneWidget);
   });
 }

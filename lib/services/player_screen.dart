@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/music_repository.dart';
 import '../widgets/music_credit.dart';
 import '../widgets/playback_progress.dart';
+import '../widgets/track_artwork.dart';
 
 class PlayerScreen extends StatefulWidget {
   final Map<String, dynamic> arguments;
@@ -677,29 +678,13 @@ class _PlayerScreenState extends State<PlayerScreen>
                                     end: Alignment.bottomRight,
                                   ),
                                 ),
-                                child: track.coverImageUrl?.isNotEmpty == true
-                                    ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(15),
-                                        child: Image.network(
-                                          track.coverImageUrl!,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
-                                              const Center(
-                                                child: Icon(
-                                                  Icons.music_note,
-                                                  size: 100,
-                                                  color: Colors.white70,
-                                                ),
-                                              ),
-                                        ),
-                                      )
-                                    : const Center(
-                                        child: Icon(
-                                          Icons.music_note,
-                                          size: 100,
-                                          color: Colors.white70,
-                                        ),
-                                      ),
+                                child: TrackArtwork(
+                                  imageUrl: track.coverImageUrl,
+                                  title: track.name,
+                                  artist: track.artist,
+                                  borderRadius: 15,
+                                  showLabel: false,
+                                ),
                               ),
                             ),
                           ),

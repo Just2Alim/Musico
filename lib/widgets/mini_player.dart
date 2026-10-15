@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../themes/app_theme.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'track_artwork.dart';
 
 class MiniPlayer extends StatelessWidget {
   final String trackName;
@@ -57,18 +57,13 @@ class MiniPlayer extends StatelessWidget {
                 borderRadius: BorderRadius.circular(5),
                 color: AppTheme.elevatedSurface,
               ),
-              child: coverImageUrl == null
-                  ? const Icon(Icons.music_note, color: Colors.white)
-                  : ClipRRect(
-                      borderRadius: BorderRadius.circular(5),
-                      child: CachedNetworkImage(
-                        imageUrl: coverImageUrl!,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => const Icon(Icons.music_note),
-                        errorWidget: (_, __, ___) =>
-                            const Icon(Icons.music_note),
-                      ),
-                    ),
+              child: TrackArtwork(
+                imageUrl: coverImageUrl,
+                title: trackName,
+                artist: artistName,
+                borderRadius: 5,
+                showLabel: false,
+              ),
             ),
 
             // Track info
